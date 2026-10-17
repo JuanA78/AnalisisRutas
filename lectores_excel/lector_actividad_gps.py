@@ -1,8 +1,8 @@
-# servicios/actividad_service.py
+# lectores_excel/lector_actividad_gps.py 
 import pandas as pd
 
 
-class ActividadService:
+class LectorActividadGPS:
 
     def __init__(self, filepath: str):
         self.filepath = filepath

@@ -1,9 +1,9 @@
-# servicios/unidades_service.py
+# lectores_excel/lector_geocercas.py
 import re
 import pandas as pd
 
 
-class UnidadesService:
+class LectorGeocercas:
 
     def __init__(self, filepath: str):
         self.filepath = filepath
@@ -69,7 +69,7 @@ class UnidadesService:
             df.columns = df.columns.astype(str).str.strip()
 
             for col in df.columns:
-                if col.upper() in ["AGRUPACION", "UNIDAD", "VEHICULO", "VEHÍCULO"]:
+                if col.upper() in ["AGRUPACION", "UNIDAD", "VEHICULO", "GROUPING"]:
                     df.rename(columns={col: "Agrupación"}, inplace=True)
                     break
 
@@ -125,17 +125,18 @@ class UnidadesService:
             "Agrupación" if "Agrupación" in self.df_raw.columns else self.df_raw.columns[0]
         )
 
-        claves_sel = [
-            re.sub(r"[^A-Z0-9]", "", str(u).upper()) for u in lista_unidades
-        ]
+        # Crear conjunto de claves limpias para comparación rápida y exacta
+        claves_sel = set(
+            re.sub(r"[^A-Z0-9]", "", str(u).upper()) for u in lista_unidades if u
+        )
 
         def coincide_unidad(val):
             clave_val = re.sub(r"[^A-Z0-9]", "", str(val).upper())
-            return any(
-                c in clave_val or clave_val in c
-                for c in claves_sel
-                if c and clave_val
-            )
+            # Se requiere coincidencia exacta para evitar que partes de cadenas coincidan erróneamente
+            return clave_val in claves_sel if clave_val else False
 
         mask = self.df_raw[col_agrup].apply(coincide_unidad)
-        return self.df_raw[mask].copy()
+        df_filtrado = self.df_raw[mask].copy()
+
+        # Elimina filas completamente duplicadas si existen en el Excel de origen
+        return df_filtrado.drop_duplicates()
