@@ -1,0 +1,23 @@
+# configuracion/colores.py
+
+class PaletaColores:
+    BG_PRINCIPAL = "#F4F6F9"
+    PANEL_LATERAL = "#1E293B"
+    CARD_OSCURA = "#0F172A"
+    CARD_BG = "#2A364F"
+    
+    TEXTO_BLANCO = "#FFFFFF"
+    TEXTO_OSCURO = "#0F172A"
+    TEXTO_MUTED = "#CBD5E1"
+    
+    AZUL_COBALTO = "#2563EB"
+    AZUL_OCEANO = "#0284C7"
+    CELESTE_VIBRANTE = "#38BDF8"
+    VERDE_EXITO = "#10B981"
+    ROJO_ALERTA = "#EF4444"
+    PURPURA_REINICIO = "#A855F7"
+    AMARILLO_ADVERTENCIA = "#F59E0B"
+    
+    BORDE_SUAVE = "#CBD5E1"
+
+    #comentado
