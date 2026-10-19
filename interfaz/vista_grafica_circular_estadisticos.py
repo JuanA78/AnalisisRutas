@@ -1,14 +1,16 @@
 import os
+import tempfile
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from visualizaciones.grafico_circular_estadisticos import GraficoPaiUnidades
 from configuracion.colores import PaletaColores
 
 try:
     from reportlab.lib.pagesizes import letter
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib import colors
     REPORTLAB_DISPONIBLE = True
@@ -42,7 +44,7 @@ class VistaGraficaCircularEstadisticos(ttk.Frame):
 
         btn_pdf = tk.Button(
             frame_top,
-            text="📄 Exportar a PDF",
+            text="📄 Exportar Gráficas a PDF",
             command=self.exportar_a_pdf,
             bg="#0284C7",
             fg="#FFFFFF",
@@ -57,8 +59,94 @@ class VistaGraficaCircularEstadisticos(ttk.Frame):
         self.df_resultado = df_resultado.copy() if df_resultado is not None else pd.DataFrame()
         self.grafica_pastel.renderizar_pie_charts(self.df_resultado)
 
+    def _generar_figura_maestra_unidades(self) -> plt.Figure:
+        """Genera una figura unificada de Matplotlib con todas las unidades en retícula."""
+        col_unidad = next((c for c in self.df_resultado.columns if "AGRUPA" in c.upper() or "UNIDAD" in c.upper()), None)
+        if not col_unidad:
+            return None
+
+        unidades = sorted(self.df_resultado[col_unidad].astype(str).unique().tolist())
+        if not unidades:
+            return None
+
+        COLUMNAS = 3
+        filas = (len(unidades) + COLUMNAS - 1) // COLUMNAS
+
+        # Crear figura global ajustando altura proporcional a la cantidad de filas
+        fig, axes = plt.subplots(filas, COLUMNAS, figsize=(11, 3.5 * filas), dpi=150, facecolor="#FFFFFF")
+        
+        # Normalizar matriz de ejes
+        if filas == 1 and COLUMNAS == 1:
+            axes = [axes]
+        elif filas == 1 or COLUMNAS == 1:
+            axes = axes.flatten()
+        else:
+            axes = axes.flatten()
+
+        mapa_colores = {
+            "A Tiempo": "#10B981",
+            "Adelanto": "#F97316",
+            "Retraso": "#EF4444",
+            "Omisión": "#2563EB",
+            "Corte Ruta": "#8B5CF6"
+        }
+
+        for i, unidad_id in enumerate(unidades):
+            ax = axes[i]
+            df_u = self.df_resultado[self.df_resultado[col_unidad].astype(str) == unidad_id]
+
+            conteos = {
+                "A Tiempo": 0, "Adelanto": 0, "Retraso": 0, "Omisión": 0, "Corte Ruta": 0
+            }
+
+            for _, r in df_u.iterrows():
+                eval_t = str(r.get("Evaluacion_Tiempo", ""))
+                estado = str(r.get("Estado_Ruta", ""))
+                tipo = str(r.get("Tipo", ""))
+                geo = str(r.get("Geocerca", ""))
+
+                if "NO REGISTRADA" in estado or "Omitida" in tipo or "Faltante" in geo:
+                    conteos["Omisión"] += 1
+                elif "CORTE" in estado or "Corte" in tipo:
+                    conteos["Corte Ruta"] += 1
+                elif "Retraso" in eval_t:
+                    conteos["Retraso"] += 1
+                elif "Adelanto" in eval_t:
+                    conteos["Adelanto"] += 1
+                elif "A Tiempo" in eval_t:
+                    conteos["A Tiempo"] += 1
+
+            labels, sizes, colors_list = [], [], []
+            total_eventos = sum(conteos.values())
+
+            if total_eventos > 0:
+                for cat, count in conteos.items():
+                    if count > 0:
+                        labels.append(cat)
+                        sizes.append(count)
+                        colors_list.append(mapa_colores[cat])
+
+                ax.pie(
+                    sizes,
+                    labels=labels,
+                    colors=colors_list,
+                    autopct="%1.1f%%",
+                    startangle=140,
+                    textprops={"fontsize": 7, "fontweight": "bold", "color": "#1E293B"},
+                    wedgeprops={"edgecolor": "#FFFFFF", "linewidth": 1.2}
+                )
+
+            ax.set_title(f"UNIDAD: {unidad_id}", color="#0F172A", fontsize=9, fontweight="bold", pad=6)
+
+        # Ocultar ejes vacíos de la cuadrícula si los hay
+        for j in range(len(unidades), len(axes)):
+            axes[j].axis("off")
+
+        plt.tight_layout()
+        return fig
+
     def exportar_a_pdf(self):
-        """Genera un documento PDF formal con el resumen estadístico por unidad."""
+        """Exporta las gráficas de pastel en un archivo PDF."""
         if not REPORTLAB_DISPONIBLE:
             messagebox.showerror("Librería Faltante", "Instala ReportLab para exportar a PDF:\npip install reportlab")
             return
@@ -68,7 +156,7 @@ class VistaGraficaCircularEstadisticos(ttk.Frame):
             return
 
         archivo_dest = filedialog.asksaveasfilename(
-            title="Guardar Reporte Estadístico",
+            title="Guardar Reporte Gráfico en PDF",
             defaultextension=".pdf",
             filetypes=[("Documentos PDF", "*.pdf")]
         )
@@ -76,78 +164,77 @@ class VistaGraficaCircularEstadisticos(ttk.Frame):
         if not archivo_dest:
             return
 
+        ruta_img_temp = None
+        figura_maestra = None
         try:
+            # 1. Generar la figura unificada en memoria
+            figura_maestra = self._generar_figura_maestra_unidades()
+
+            if figura_maestra is None:
+                messagebox.showerror("Error", "No se pudieron procesar las gráficas de las unidades.")
+                return
+
+            # 2. Guardar la figura maesra en un archivo temporal de alta resolución
+            temp_dir = tempfile.gettempdir()
+            ruta_img_temp = os.path.join(temp_dir, "grafica_maestra_pie_temp.png")
+
+            figura_maestra.savefig(
+                ruta_img_temp,
+                dpi=180,
+                bbox_inches="tight",
+                facecolor="#FFFFFF",
+                edgecolor="none"
+            )
+            plt.close(figura_maestra)
+
+            # 3. Construir el documento con ReportLab
             doc = SimpleDocTemplate(
                 archivo_dest,
                 pagesize=letter,
-                rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36
+                rightMargin=36,
+                leftMargin=36,
+                topMargin=36,
+                bottomMargin=36
             )
             styles = getSampleStyleSheet()
 
             titulo_style = ParagraphStyle(
-                "Titulo",
+                "TituloReporte",
                 parent=styles["Heading1"],
                 fontName="Helvetica-Bold",
-                fontSize=16,
+                fontSize=14,
                 textColor=colors.HexColor("#0F172A"),
+                alignment=1,
                 spaceAfter=12
             )
 
             elementos = [
-                Paragraph("REPORTE ESTADÍSTICO DE CUMPLIMIENTO DE RUTAS", titulo_style),
+                Paragraph("Graficas De Cumplimiento Por Unidad", titulo_style),
                 Spacer(1, 10)
             ]
 
-            col_unidad = next((c for c in self.df_resultado.columns if "AGRUPA" in c.upper() or "UNIDAD" in c.upper()), "Agrupación")
-            unidades = sorted(self.df_resultado[col_unidad].astype(str).unique().tolist())
+            # 4. Insertar imagen ajustada
+            ancho_pag_util = 540
+            alto_proporcional = min(680, int(ancho_pag_util * (figura_maestra.get_size_inches()[1] / figura_maestra.get_size_inches()[0])))
 
-            tabla_datos = [["Unidad", "A Tiempo", "Retrasos", "Adelantos", "Omisiones", "Cortes Ruta", "Retraso Total"]]
+            img_pdf = Image(ruta_img_temp, width=ancho_pag_util, height=alto_proporcional)
+            elementos.append(img_pdf)
 
-            for u in unidades:
-                df_u = self.df_resultado[self.df_resultado[col_unidad].astype(str) == u]
-                
-                a_tiempo, retrasos, adelantos, omisiones, cortes = 0, 0, 0, 0, 0
-                segs_ret = 0.0
-
-                for _, r in df_u.iterrows():
-                    eval_t = str(r.get("Evaluacion_Tiempo", ""))
-                    estado = str(r.get("Estado_Ruta", ""))
-                    tipo = str(r.get("Tipo", ""))
-                    geo = str(r.get("Geocerca", ""))
-                    s_r = r.get("Segundos_Retraso", 0.0)
-
-                    if isinstance(s_r, (int, float)) and s_r > 0:
-                        segs_ret += s_r
-
-                    if "NO REGISTRADA" in estado or "Omitida" in tipo or "Faltante" in geo:
-                        omisiones += 1
-                    elif "CORTE" in estado or "Corte" in tipo:
-                        cortes += 1
-                    elif "Retraso" in eval_t:
-                        retrasos += 1
-                    elif "Adelanto" in eval_t:
-                        adelantos += 1
-                    elif "A Tiempo" in eval_t:
-                        a_tiempo += 1
-
-                mins_tot = f"+{round(segs_ret / 60.0, 1)}m" if segs_ret > 0 else "0m"
-                tabla_datos.append([u, str(a_tiempo), str(retrasos), str(adelantos), str(omisiones), str(cortes), mins_tot])
-
-            t = Table(tabla_datos, colWidths=[80, 70, 70, 70, 70, 70, 80])
-            t.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0F172A")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#38BDF8")),
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, 0), 9),
-                ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-            ]))
-
-            elementos.append(t)
             doc.build(elementos)
-            messagebox.showinfo("Éxito", f"Reporte exportado correctamente:\n{os.path.basename(archivo_dest)}")
+
+            messagebox.showinfo(
+                "Éxito",
+                f"Gráficas exportadas correctamente a PDF:\n{os.path.basename(archivo_dest)}"
+            )
 
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo generar el PDF:\n{e}")
+
+        finally:
+            if figura_maestra is not None:
+                plt.close(figura_maestra)
+            if ruta_img_temp and os.path.exists(ruta_img_temp):
+                try:
+                    os.remove(ruta_img_temp)
+                except OSError:
+                    pass

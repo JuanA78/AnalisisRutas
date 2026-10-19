@@ -103,54 +103,54 @@ class ServicioActividadGPS:
     @classmethod
     def obtener_metricas_resumen(cls, df_actividad: pd.DataFrame) -> dict:
         """
-        Extrae exclusivamente las 3 métricas de Actividad GPS para el Resumen General:
-        - Km Mensajes (Kilometraje)
-        - Velocidad Máxima
-        - Tiempo Viajes
-        Devuelve un diccionario estructurado por unidad { "UNIDAD_ID": {...} }
+        Extrae las 3 métricas de Actividad GPS para el Resumen General.
+        Prioriza la columna 'Kilometraje' ya filtrada por LectorActividadGPS.
         """
         if df_actividad is None or df_actividad.empty:
             return {}
 
         df = df_actividad.copy()
 
-        # Identificar columnas en el reporte GPS
-        col_unidad = next(
-            (c for c in df.columns if any(k in str(c).upper() for k in ["GROUPING", "AGRUPA", "UNIDAD", "VEHICU"])),
-            None
-        )
-        col_km = next(
-            (c for c in df.columns if any(k in str(c).upper() for k in ["KILOMETRAJE", "TODOS LOS MENSAJES", "KM"])),
-            None
-        )
-        col_vel_max = next(
-            (c for c in df.columns if "MÁXIMA" in str(c).upper() or "MAXIMA" in str(c).upper() or "VELOCIDAD" in str(c).upper()),
-            None
-        )
-        col_tiempo_viajes = next(
-            (c for c in df.columns if "TIEMPO EN VIAJES" in str(c).upper() or "TIEMPO VIAJES" in str(c).upper() or "DURACIÓN" in str(c).upper()),
-            None
-        )
+        # 1. Búsqueda de columna de unidad
+        col_unidad = next((c for c in df.columns if any(k in str(c).upper() for k in ["GROUPING", "AGRUPA", "UNIDAD"])), None)
 
-        if not col_unidad:
-            return {}
+        # 2. Búsqueda de columna de Kilometraje (Prioriza 'Kilometraje' renombrada o 'TODOS LOS MENSAJES')
+        col_km = None
+        for c in df.columns:
+            c_u = str(c).upper()
+            if c_u == "KILOMETRAJE" or "TODOS LOS MENSAJES" in c_u or "KILOMETRAJE EN TODOS" in c_u:
+                col_km = c
+                break
+        
+        if not col_km:
+            col_km = next((c for c in df.columns if "KILOMETRAJE" in str(c).upper() or "KM" in str(c).upper()), None)
+
+        # 3. Búsqueda de Velocidad y Tiempo
+        col_vel_max = next((c for c in df.columns if "VELOCIDAD MÁXIMA" in str(c).upper() or "VELOCIDAD MAXIMA" in str(c).upper() or "VELOCIDAD MÁX" in str(c).upper()), None)
+        col_tiempo_viajes = next((c for c in df.columns if "TIEMPO EN VIAJES" in str(c).upper() or "TIEMPO VIAJES" in str(c).upper() or "TIEMPO DE VIAJES" in str(c).upper()), None)
 
         resultado = {}
+
         for _, fila in df.iterrows():
-            u_raw = str(fila.get(col_unidad, "")).strip()
+            u_raw = str(fila.get(col_unidad, "") if col_unidad else fila.iloc[0]).strip()
             u_norm = cls._normalizar_identificador(u_raw)
 
-            if not u_norm:
+            if not u_norm or u_norm in ["NAN", "NONE", "GROUPING"]:
                 continue
 
-            km_val = fila.get(col_km, "-") if col_km else "-"
-            vel_val = fila.get(col_vel_max, "-") if col_vel_max else "-"
-            tiempo_val = fila.get(col_tiempo_viajes, "-") if col_tiempo_viajes else "-"
+            # Extracción explícita
+            km_val = fila.get(col_km, "-")
+            vel_val = fila.get(col_vel_max, "-")
+            tiempo_val = fila.get(col_tiempo_viajes, "-")
+
+            # Formateo limpio de texto
+            km_str = str(km_val).replace("km", "").strip() if pd.notna(km_val) else "-"
+            vel_str = str(vel_val).replace("km/h", "").strip() if pd.notna(vel_val) else "-"
 
             resultado[u_norm] = {
-                "km": str(km_val) if pd.notna(km_val) and str(km_val).strip() not in ["nan", "None", ""] else "-",
-                "velocidad_max": str(vel_val) if pd.notna(vel_val) and str(vel_val).strip() not in ["nan", "None", ""] else "-",
-                "tiempo_viajes": str(tiempo_val) if pd.notna(tiempo_val) and str(tiempo_val).strip() not in ["nan", "None", ""] else "-"
+                "km": f"{km_str} km" if km_str not in ["nan", "None", "", "-"] else "-",
+                "velocidad_max": vel_str if vel_str not in ["nan", "None", ""] else "-",
+                "tiempo_viajes": str(tiempo_val).strip() if pd.notna(tiempo_val) and str(tiempo_val).strip() not in ["nan", "None", ""] else "-"
             }
 
         return resultado

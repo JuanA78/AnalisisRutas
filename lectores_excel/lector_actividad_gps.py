@@ -1,4 +1,3 @@
-# lectores_excel/lector_actividad_gps.py 
 import pandas as pd
 
 
@@ -18,44 +17,45 @@ class LectorActividadGPS:
                 "Resumen" if "Resumen" in excel_file.sheet_names else 0
             )
 
-            df_temp = pd.read_excel(excel_file, sheet_name=sheet_target)
+            # Leer las primeras filas sin header para inspeccionar encabezados combinados
+            df_raw = pd.read_excel(excel_file, sheet_name=sheet_target, header=None)
 
-            # Buscar la fila de encabezados
-            header_row = 0
-            for i in range(min(15, len(df_temp))):
-                row_vals = (
-                    df_temp.iloc[i].astype(str).str.strip().str.upper().tolist()
-                )
-                if any("AGRUPA" in v or "KILOMETRAJE" in v for v in row_vals):
-                    header_row = i + 1
+            # 1. Encontrar la fila de datos inicial (donde aparece 'AGRUPA' o 'GROUPING')
+            header_idx = 0
+            for i in range(min(15, len(df_raw))):
+                fila_str = df_raw.iloc[i].astype(str).str.upper().tolist()
+                if any("AGRUPA" in v or "GROUPING" in v or "UNIDAD" in v for v in fila_str):
+                    header_idx = i
                     break
 
-            if header_row > 0:
-                self.df = pd.read_excel(
-                    excel_file, sheet_name=sheet_target, header=header_row
-                )
-            else:
-                self.df = df_temp
+            # Releer con la fila de encabezados identificada
+            self.df = pd.read_excel(excel_file, sheet_name=sheet_target, header=header_idx)
 
-            self.df.columns = self.df.columns.astype(str).str.strip()
-
-            # -------------------------------------------------------------
-            # BÚSQUEDA POR NOMBRE EXACTO O POR POSICIÓN (COLUMNA 2)
-            # -------------------------------------------------------------
-            col_km_deseada = None
-
-            # 1. Intentar por coincidencia de nombre de columna
+            # Detectar todas las columnas que hablen de Kilometraje
+            cols_km = []
             for col in self.df.columns:
-                col_u = col.upper()
-                if "TODOS LOS MENSAJES" in col_u or "TODOS LOS MENSAJE" in col_u:
-                    col_km_deseada = col
-                    break
+                c_upper = str(col).strip().upper()
+                # Si el encabezado menciona 'TODOS' o 'MENSAJES'
+                if "TODOS" in c_upper or "MENSAJE" in c_upper:
+                    cols_km.append((col, 100)) # Prioridad máxima
+                elif "KILOMETRAJE" in c_upper or "KM" in c_upper or "UNNAMED" in c_upper:
+                    cols_km.append((col, 1))
 
-            # 2. Si no la encuentra por nombre, tomar directamente la Posición 2 (3ra Columna)
-            if not col_km_deseada and len(self.df.columns) >= 3:
+            col_km_deseada = None
+            
+            # Si hay coincidencia por texto de alta prioridad
+            coincidencias_top = [c for c, prio in cols_km if prio == 100]
+            if coincidencias_top:
+                col_km_deseada = coincidencias_top[0]
+            elif len(cols_km) >= 2:
+                # La ÚLTIMA columna de kilometraje en el Excel es SIEMPRE "en todos los mensajes"
+                col_km_deseada = cols_km[-1][0]
+            elif len(self.df.columns) >= 3:
+                # Si no detectó los nombres por celdas combinadas, la columna 3 (índice 2) en base 0
+                # en el reporte de Wialon es "Kilometraje en todos los mensajes"
                 col_km_deseada = self.df.columns[2]
 
-            # Renombrar esa columna elegida a "Kilometraje"
+            # Si se encontró la columna objetivo, la renombramos
             if col_km_deseada:
                 self.df.rename(columns={col_km_deseada: "Kilometraje"}, inplace=True)
 

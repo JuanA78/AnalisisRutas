@@ -19,13 +19,12 @@ class ServicioResumenGeneral:
         df_actividad_gps: pd.DataFrame = None
     ) -> pd.DataFrame:
         """
-        Consolida la tabla del Resumen General.
-        - Cálculos de geocercas, horarios y conteos vienen de RutaService.
-        - Las 3 métricas de mensajes GPS vienen de ServicioActividadGPS.
+        Consolida la tabla del Resumen General con la columna Min. Retraso Acum.
+        y la Velocidad Máxima real enviada por ServicioActividadGPS.
         """
         columnas_finales = [
             "Unidad", "Hora Inicio", "Hora Término", "Tiempo Total",
-            "A Tiempo", "Retrasos", "Adelantos", "Omisiones",
+            "A Tiempo", "Retrasos", "Adelantos", "Omisiones", "Min. Retraso Acum.",
             "Km Actividad Diaria", "Velocidad Máx.", "Tiempo Viajes GPS"
         ]
 
@@ -48,11 +47,12 @@ class ServicioResumenGeneral:
         if "Unidad" not in resumen.columns:
             resumen["Unidad"] = ""
 
-        # Contadores calculados por RutaService en df_resultado_geocercas
+        # Inicializar contadores
         resumen["A Tiempo"] = 0
         resumen["Retrasos"] = 0
         resumen["Adelantos"] = 0
         resumen["Omisiones"] = 0
+        resumen["Min. Retraso Acum."] = "0m"
 
         if df_resultado_geocercas is not None and not df_resultado_geocercas.empty and "Agrupación" in df_resultado_geocercas.columns:
             col_agrupa = "Agrupación"
@@ -77,6 +77,7 @@ class ServicioResumenGeneral:
                     resumen.at[idx, "Retrasos"] = int(evals.str.contains("RETRASO", regex=False).sum())
                     resumen.at[idx, "Adelantos"] = int(evals.str.contains("ADELANTO", regex=False).sum())
 
+                # Conteo de Omisiones
                 omisiones = pd.Series(False, index=datos_u.index)
                 if "Tipo" in datos_u.columns:
                     omisiones |= datos_u["Tipo"].fillna("").astype(str).str.upper().str.contains("OMITID", regex=True)
@@ -85,25 +86,32 @@ class ServicioResumenGeneral:
 
                 resumen.at[idx, "Omisiones"] = int(omisiones.sum())
 
-        # Obtener exclusivamente las 3 métricas requeridas desde ServicioActividadGPS
-        metricas_gps = ServicioActividadGPS.obtener_metricas_resumen(df_actividad_gps)
+                # Cálculo de Minutos de Retraso Acumulado
+                if "Segundos_Retraso" in datos_u.columns:
+                    total_segundos = datos_u.loc[datos_u["Segundos_Retraso"] > 0, "Segundos_Retraso"].sum()
+                    minutos = int(total_segundos // 60)
+                    segundos = int(total_segundos % 60)
+                    resumen.at[idx, "Min. Retraso Acum."] = f"{minutos}m {segundos}s" if segundos > 0 else f"{minutos}m"
 
-        resumen["Velocidad Máx."] = "-"
-        resumen["Tiempo Viajes GPS"] = "-"
+      # Métricas desde ServicioActividadGPS
+        metricas_gps = ServicioActividadGPS.obtener_metricas_resumen(df_actividad_gps)
 
         for idx, fila in resumen.iterrows():
             u_norm = cls._normalizar_id(fila["Unidad"])
             if u_norm in metricas_gps:
                 datos_gps = metricas_gps[u_norm]
-                # Si el kilometraje venía vacío del de geocercas, usar el de GPS
-                if str(resumen.at[idx, "Km Actividad Diaria"]).strip() in ["-", "", "0.0", "0 km"]:
-                    resumen.at[idx, "Km Actividad Diaria"] = datos_gps["km"]
+                
+                # Asignación directa e incondicional desde el reporte GPS
+                resumen.at[idx, "Km Actividad Diaria"] = datos_gps["km"]
                 resumen.at[idx, "Velocidad Máx."] = datos_gps["velocidad_max"]
                 resumen.at[idx, "Tiempo Viajes GPS"] = datos_gps["tiempo_viajes"]
 
+        # Garantizar valores por defecto (-) si alguna columna quedó vacía o ausente
         for col in columnas_finales:
             if col not in resumen.columns:
                 resumen[col] = "-"
+            else:
+                resumen[col] = resumen[col].fillna("-")
 
         return resumen[columnas_finales].copy()
 
@@ -111,7 +119,6 @@ class ServicioResumenGeneral:
     def obtener_top_5_retrasos_unidad(
         cls, df_resultado_geocercas: pd.DataFrame, unidad_id: str
     ) -> list:
-        """Obtiene los 5 retrasos más altos calculados por RutaService para la unidad requerida."""
         if df_resultado_geocercas is None or df_resultado_geocercas.empty:
             return []
 

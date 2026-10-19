@@ -23,6 +23,7 @@ class VistaResumenGeneral(tk.Frame):
         ("Retrasos", "Retrasos", 80),
         ("Adelantos", "Adelantos", 80),
         ("Omisiones", "Omisiones", 80),
+        ("Min. Retraso Acum.", "Min. Retraso Acum.", 120),  
         ("Km Actividad Diaria", "Km Mensajes", 130),
         ("Velocidad Máx.", "Velocidad Máx.", 110),
         ("Tiempo Viajes GPS", "Tiempo Viajes", 130),
