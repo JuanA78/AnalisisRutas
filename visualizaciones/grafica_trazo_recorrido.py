@@ -1,4 +1,3 @@
-
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import pandas as pd
@@ -42,13 +41,10 @@ class GraficaTrazoRecorrido:
 
         if ruta_seleccionada:
             es_agua_salada = "AGUA SALADA" in ruta_seleccionada.upper()
-
         elif ruta_cat == "El Arbolito":
             es_agua_salada = False
-
         elif ruta_cat == "Agua Salada":
             es_agua_salada = True
-
         elif "Geocerca" in df_u.columns:
             geocercas_unidad = (
                 df_u["Geocerca"]
@@ -62,7 +58,6 @@ class GraficaTrazoRecorrido:
                 g in ["Canal_CasaEloy", "AguaSalada"]
                 for g in geocercas_unidad
             )
-
         else:
             es_agua_salada = False
 
@@ -78,7 +73,7 @@ class GraficaTrazoRecorrido:
             for i, geocerca in enumerate(eje_geocercas)
         }
 
-        # 3. Extraer todos los puntos válidos de la trayectoria
+        # 3. Extraer puntos válidos
         puntos = cls._extraer_puntos(df_u, x_map)
 
         # 4. Dibujar trayectoria completa y marcadores
@@ -164,6 +159,7 @@ class GraficaTrazoRecorrido:
 
                     texto = (
                         f"GEOCERCA: {p['geocerca_nombre']}\n"
+                        f"Vuelta: {p['vuelta_base']} | Sentido: {p['sentido']}\n"
                         f"Entrada: {p['entrada']} | Salida: {p['salida']}\n"
                         f"Tiempo Real: {p['tiempo_real']} | "
                         f"Estimado: {p['tiempo_est']}\n"
@@ -197,10 +193,7 @@ class GraficaTrazoRecorrido:
         for _, r in df_u.iterrows():
 
             tipo_r = str(r.get("Tipo", "")).strip().upper()
-
-            estado_r = str(
-                r.get("Estado_Ruta", "")
-            ).strip().upper()
+            estado_r = str(r.get("Estado_Ruta", "")).strip().upper()
 
             # Omitir geocercas repetidas en el gráfico
             if (
@@ -210,9 +203,7 @@ class GraficaTrazoRecorrido:
                 continue
 
             val_g = str(r.get("Geocerca", "")).strip()
-
             eval_t = str(r.get("Evaluacion_Tiempo", ""))
-
             desfase = str(r.get("Desfase", "-"))
 
             # Identificar eventos
@@ -227,8 +218,12 @@ class GraficaTrazoRecorrido:
                 or "CORTE" in tipo_r
             )
 
-            es_reinicio = (
-                "REINICIO" in estado_r
+            es_anomalia = (
+                "ANOMALÍA" in estado_r
+                or "ANOMALIA" in estado_r
+                or "ANOMALÍA" in tipo_r
+                or "ANOMALIA" in tipo_r
+                or "REINICIO" in estado_r
                 or "REINICIO" in tipo_r
             )
 
@@ -237,11 +232,8 @@ class GraficaTrazoRecorrido:
                 or "INICIO DE RUTA" in tipo_r
             )
 
-            g_nombre = val_g.replace(
-                " (Faltante)", ""
-            ).strip()
+            g_nombre = val_g.replace(" (Faltante)", "").strip()
 
-            # Solo dibujar geocercas presentes en el eje configurado
             if g_nombre not in x_map:
                 continue
 
@@ -252,7 +244,7 @@ class GraficaTrazoRecorrido:
 
             sentido = str(r.get("Sentido", "Ida")).strip()
 
-            # Separar visualmente ida y regreso
+            # Separar visualmente ida (-0.20) y regreso (+0.20)
             y_offset = (
                 -0.20
                 if sentido.lower() == "ida"
@@ -265,20 +257,12 @@ class GraficaTrazoRecorrido:
             # Colores de evaluación
             if es_faltante:
                 color = PaletaColores.ROJO_ALERTA
-
-            elif es_corte or es_reinicio:
-                color = "#9CA3AF"
-
-            elif "RETRASO" in eval_t.upper() or (
-                desfase.startswith("+")
-            ):
+            elif es_anomalia:
+                color = "#8B5CF6"  # Púrpura para anomalías
+            elif "RETRASO" in eval_t.upper() or desfase.startswith("+"):
                 color = PaletaColores.ROJO_ALERTA
-
-            elif "ADELANTO" in eval_t.upper() or (
-                "-" in desfase and desfase != "-"
-            ):
+            elif "ADELANTO" in eval_t.upper() or ("-" in desfase and desfase != "-"):
                 color = "#F97316"
-
             else:
                 color = PaletaColores.VERDE_EXITO
 
@@ -290,7 +274,7 @@ class GraficaTrazoRecorrido:
                 "color": color,
                 "es_faltante": es_faltante,
                 "es_corte": es_corte,
-                "es_reinicio": es_reinicio,
+                "es_anomalia": es_anomalia,
                 "es_inicio": es_inicio,
                 "geocerca_nombre": g_nombre,
                 "entrada": str(r.get("Entrada", "-")),
@@ -302,8 +286,6 @@ class GraficaTrazoRecorrido:
                 "estado": estado_r
             })
 
-        # IMPORTANTE: conservar el orden original del servicio.
-        # No ordenar por X, porque alteraría el recorrido real.
         return puntos
 
     @staticmethod
@@ -312,19 +294,18 @@ class GraficaTrazoRecorrido:
         if not puntos:
             return
 
-        # 1. Conectar cada punto con el siguiente.
-        # No se interrumpe la trayectoria por cortes, reinicios
-        # ni geocercas omitidas.
+        # 1. Conectar cada punto con el siguiente
         for i in range(len(puntos) - 1):
 
             p1 = puntos[i]
             p2 = puntos[i + 1]
 
-            # Línea gris punteada para los inicios y cambios de vuelta.
             es_transicion = (
                 p1["vuelta_base"] != p2["vuelta_base"]
                 or p1["es_inicio"]
                 or p2["es_inicio"]
+                or p1["es_anomalia"]
+                or p2["es_anomalia"]
             )
 
             if es_transicion:
@@ -354,12 +335,11 @@ class GraficaTrazoRecorrido:
                 zorder=2
             )
 
-        # 2. Dibujar marcadores.
-        # No se dibujan cuadrados morados.
+        # 2. Dibujar marcadores según el estado
         for p in puntos:
 
             if p["es_faltante"]:
-                # X roja para indicar dónde no pasó la unidad
+                # X roja para indicar omitidas
                 ax.scatter(
                     p["x"],
                     p["y"],
@@ -370,7 +350,21 @@ class GraficaTrazoRecorrido:
                     zorder=6
                 )
 
+            elif p["es_anomalia"]:
+                # Diamante morado para anomalías
+                ax.scatter(
+                    p["x"],
+                    p["y"],
+                    color="#8B5CF6",
+                    edgecolors="#FFFFFF",
+                    linewidths=1.2,
+                    marker="D",
+                    s=75,
+                    zorder=6
+                )
+
             else:
+                # Círculos normales para puntos A Tiempo / Adelanto / Retraso / Corte
                 ax.scatter(
                     p["x"],
                     p["y"],
@@ -388,18 +382,20 @@ class GraficaTrazoRecorrido:
         vueltas = sorted({
             p["vuelta_base"]
             for p in puntos
+            if p.get("vuelta_base") is not None
         }) if puntos else [1]
 
-        ax.set_ylim(
-            min(vueltas) - 0.6,
-            max(vueltas) + 0.6
-        )
+        if not vueltas:
+            vueltas = [1]
 
+        min_v = min(vueltas)
+        max_v = max(vueltas)
+
+        ax.set_ylim(min_v - 0.6, max_v + 0.6)
         ax.set_yticks(vueltas)
+        ax.set_yticklabels([f"Vuelta {v}" for v in vueltas], fontsize=8.5, fontweight="bold")
 
-        ax.tick_params(
-            colors=PaletaColores.TEXTO_MUTED
-        )
+        ax.tick_params(colors=PaletaColores.TEXTO_MUTED)
 
         ax.grid(
             True,
@@ -411,65 +407,16 @@ class GraficaTrazoRecorrido:
         for spine in ax.spines.values():
             spine.set_visible(False)
 
-        # Leyenda sin cuadrados morados
+        # Leyenda
         elementos = [
-            Line2D(
-                [0], [0],
-                color=PaletaColores.TEXTO_BLANCO,
-                lw=2.5,
-                linestyle="-",
-                label="Trayecto IDA"
-            ),
-            Line2D(
-                [0], [0],
-                color=PaletaColores.CELESTE_VIBRANTE,
-                lw=2.5,
-                linestyle="--",
-                label="Trayecto REGRESO"
-            ),
-            Line2D(
-                [0], [0],
-                color="#9CA3AF",
-                lw=1.8,
-                linestyle=":",
-                label="Inicio / Cambio de vuelta"
-            ),
-            Line2D(
-                [0], [0],
-                marker="o",
-                color="w",
-                linestyle="None",
-                markerfacecolor=PaletaColores.VERDE_EXITO,
-                markersize=7,
-                label="A Tiempo"
-            ),
-            Line2D(
-                [0], [0],
-                marker="o",
-                color="w",
-                linestyle="None",
-                markerfacecolor="#F97316",
-                markersize=7,
-                label="Adelanto"
-            ),
-            Line2D(
-                [0], [0],
-                marker="o",
-                color="w",
-                linestyle="None",
-                markerfacecolor=PaletaColores.ROJO_ALERTA,
-                markersize=7,
-                label="Retraso"
-            ),
-            Line2D(
-                [0], [0],
-                marker="x",
-                color=PaletaColores.ROJO_ALERTA,
-                linestyle="None",
-                markersize=8,
-                markeredgewidth=2,
-                label="Geocerca Omitida"
-            )
+            Line2D([0], [0], color=PaletaColores.TEXTO_BLANCO, lw=2.5, linestyle="-", label="Trayecto IDA"),
+            Line2D([0], [0], color=PaletaColores.CELESTE_VIBRANTE, lw=2.5, linestyle="--", label="Trayecto REGRESO"),
+            Line2D([0], [0], color="#9CA3AF", lw=1.8, linestyle=":", label="Inicio / Cambio de vuelta"),
+            Line2D([0], [0], marker="o", color="w", linestyle="None", markerfacecolor=PaletaColores.VERDE_EXITO, markersize=7, label="A Tiempo"),
+            Line2D([0], [0], marker="o", color="w", linestyle="None", markerfacecolor="#F97316", markersize=7, label="Adelanto"),
+            Line2D([0], [0], marker="o", color="w", linestyle="None", markerfacecolor=PaletaColores.ROJO_ALERTA, markersize=7, label="Retraso"),
+            Line2D([0], [0], marker="D", color="w", linestyle="None", markerfacecolor="#8B5CF6", markersize=7, label="Anomalía de Ruta"),
+            Line2D([0], [0], marker="x", color=PaletaColores.ROJO_ALERTA, linestyle="None", markersize=8, markeredgewidth=2, label="Geocerca Omitida")
         ]
 
         ax.legend(

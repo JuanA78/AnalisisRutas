@@ -3,13 +3,13 @@ from tkinter import ttk
 import pandas as pd
 
 from configuracion.colores import PaletaColores
-from servicios.servicio_actividad_gps import ServicioActividadGPS
+from lectores_excel.lector_actividad_gps import LectorActividadGPS
 
 
 class VistaActividadDiariaGPS(ttk.Frame):
-    """Componente visual para desplegar la tabla de Actividad GPS."""
+    """Componente visual para desplegar la tabla de Actividad GPS basada en LectorActividadGPS."""
 
-    COLOR_ENCABEZADO_BG = "#0F172A"  # Fondo personalizado para encabezados
+    COLOR_ENCABEZADO_BG = "#0F172A"
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -19,9 +19,6 @@ class VistaActividadDiariaGPS(ttk.Frame):
         contenedor = ttk.Frame(self)
         contenedor.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # ----------------------------------------------------
-        # CONFIGURACIÓN DE ESTILOS
-        # ----------------------------------------------------
         estilo = ttk.Style()
 
         # Estilo de la tabla
@@ -40,7 +37,7 @@ class VistaActividadDiariaGPS(ttk.Frame):
             foreground=[("selected", getattr(PaletaColores, "TEXTO_BLANCO", "#FFFFFF"))]
         )
 
-        # Estilo del encabezado con fondo #0F172A
+        # Estilo del encabezado
         estilo.configure(
             "GPSTable.Treeview.Heading",
             background=self.COLOR_ENCABEZADO_BG,
@@ -73,7 +70,7 @@ class VistaActividadDiariaGPS(ttk.Frame):
             background=getattr(PaletaColores, "CARD_BG", "#2A364F")
         )
 
-        # Barras de desplazamiento
+        # Scrollbars
         scroll_y = ttk.Scrollbar(contenedor, orient="vertical", command=self.tabla_gps.yview)
         scroll_y.pack(side="right", fill="y")
 
@@ -82,36 +79,53 @@ class VistaActividadDiariaGPS(ttk.Frame):
 
         self.tabla_gps.configure(yscrollcommand=scroll_y.set, xscrollcommand=scroll_x.set)
 
-    def cargar_datos(self, df_actividad: pd.DataFrame, unidades_sel: list = None):
-        """Filtra los datos con el servicio y renderiza las filas en la tabla."""
-        self.tabla_gps.delete(*self.tabla_gps.get_children())
+    def cargar_datos_desde_lector(self, filepath: str, ruta_seleccionada: str = None):
+        """Carga y procesa el archivo Excel directamente desde LectorActividadGPS."""
+        lector = LectorActividadGPS(filepath)
+        df_datosgps = lector.cargar_datos_completos(ruta_seleccionada)
+        self.cargar_datos(df_datosgps)
 
-        # Filtrar mediante la capa de servicio
-        df = ServicioActividadGPS.filtrar_actividad(df_actividad, unidades_sel)
+    def cargar_datos(self, df_actividad: pd.DataFrame):
+        """Limpia el Treeview y renderiza las filas del DataFrame actualizado."""
+        # Vaciado completo previo
+        for i in self.tabla_gps.get_children():
+            self.tabla_gps.delete(i)
 
-        if df is None or df.empty:
+        if df_actividad is None or df_actividad.empty:
             self.tabla_gps["columns"] = ()
             return
 
-        columnas = [str(col) for col in df.columns]
+        columnas = [str(col) for col in df_actividad.columns]
         self.tabla_gps["columns"] = columnas
 
-        for columna in columnas:
-            self.tabla_gps.heading(columna, text=columna)
-            self.tabla_gps.column(columna, width=140, minwidth=80, anchor="w")
+        for idx, col in enumerate(columnas):
+            self.tabla_gps.heading(col, text=col)
+            if idx == 0:
+                anchura, alineacion = 140, "center"
+            elif idx in [1, 2]:
+                anchura, alineacion = 170, "center"
+            elif idx in [3, 4]:
+                anchura, alineacion = 140, "center"
+            elif idx in [5, 6, 7]:
+                anchura, alineacion = 150, "center"
+            else:
+                anchura, alineacion = 140, "w"
 
-        for i, (_, fila) in enumerate(df.iterrows()):
+            self.tabla_gps.column(col, width=anchura, minwidth=90, anchor=alineacion)
+
+        # Cargar las nuevas filas filtradas
+        for i, (_, fila) in enumerate(df_actividad.iterrows()):
             valores = [
-                "" if pd.isna(valor) else str(valor)
+                "" if pd.isna(valor) else str(valor).strip()
                 for valor in fila.tolist()
             ]
             tag_fila = "fila_par" if i % 2 == 0 else "fila_impar"
             self.tabla_gps.insert("", "end", values=valores, tags=(tag_fila,))
 
     @staticmethod
-    def obtener_resumen_actividad(df_actividad: pd.DataFrame, unidades_sel: list = None) -> pd.DataFrame:
-        return ServicioActividadGPS.filtrar_actividad(df_actividad, unidades_sel)
-
-    @staticmethod
-    def obtener_unidades(df_actividad: pd.DataFrame) -> list:
-        return ServicioActividadGPS.obtener_unidades(df_actividad)
+    def obtener_unidades_desde_df(df_actividad: pd.DataFrame) -> list:
+        """Extrae la lista única de unidades leídas de la primera columna."""
+        if df_actividad is None or df_actividad.empty:
+            return []
+        col_unid = df_actividad.columns[0]
+        return sorted(df_actividad[col_unid].dropna().astype(str).str.strip().unique().tolist())

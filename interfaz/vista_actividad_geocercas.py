@@ -9,6 +9,9 @@ from configuracion.colores import PaletaColores
 class VistaActividadGeocercas(ttk.Frame):
     """Vista para consultar la actividad de geocercas por unidad."""
 
+    # Puntos de corte globales aplicables a todas las rutas
+    PUNTOS_CORTE_GLOBALES = {"CORTEIMSS", "CENTRALDEAUTOBUSES"}
+
     def __init__(self, parent):
         super().__init__(parent)
         self.df_resultado = pd.DataFrame()
@@ -150,8 +153,8 @@ class VistaActividadGeocercas(ttk.Frame):
         self.tree.tag_configure("adelanto", background="#FEF3C7", foreground="#92400E")
         self.tree.tag_configure("retraso", background="#FEE2E2", foreground="#991B1B")
         self.tree.tag_configure("no_registrada", background="#DBEAFE", foreground="#1D4ED8")
-        self.tree.tag_configure("corte", background="#EDE9FE", foreground="#6D28D9")  # Morado destacado para cortes
-        self.tree.tag_configure("reinicio", background="#334155", foreground="#F8FAFC")
+        self.tree.tag_configure("corte", background="#EDE9FE", foreground="#6D28D9") 
+        self.tree.tag_configure("anomalia", background="#334155", foreground="#F8FAFC")
         self.tree.tag_configure("repetida", background="#F1F5F9", foreground="#475569")
         self.tree.tag_configure("neutral", background="#FFFFFF", foreground="#0F172A")
 
@@ -212,38 +215,43 @@ class VistaActividadGeocercas(ttk.Frame):
         for item in self.tree.get_children():
             self.tree.delete(item)
 
-    @staticmethod
-    def _obtener_color(estado_ruta, evaluacion_tiempo, tipo, geocerca=""):
-        estado = VistaActividadGeocercas._normalizar(estado_ruta)
-        evaluacion = VistaActividadGeocercas._normalizar(evaluacion_tiempo)
-        tipo_n = VistaActividadGeocercas._normalizar(tipo)
-        geo = VistaActividadGeocercas._normalizar(geocerca)
+    @classmethod
+    def _obtener_color(cls, estado_ruta, evaluacion_tiempo, tipo, geocerca=""):
+        estado = cls._normalizar(estado_ruta)
+        evaluacion = cls._normalizar(evaluacion_tiempo)
+        tipo_n = cls._normalizar(tipo)
+        geo = cls._normalizar(geocerca)
 
         geo_compacta = geo.replace(" ", "").replace("_", "").replace("-", "")
 
-        # 1. Cortes tienen prioridad visual morada
+        # 1. Cortes de ruta globales
         es_corte = (
             "CORTE" in estado
             or tipo_n == "CORTE"
-            or "CORTEIMSS" in geo_compacta
-            or "CENTRALDEAUTOBUSES" in geo_compacta
+            or any(corte in geo_compacta for corte in cls.PUNTOS_CORTE_GLOBALES)
         )
         if es_corte:
             return "corte"
 
-        # 2. Geocercas no registradas / faltantes
+        # 2. Anomalías de ruta (saltos atípicos/reinicios)
+        es_anomalia = (
+            "ANOMALIA" in estado 
+            or "ANOMALIA" in tipo_n 
+            or "REINICIO" in estado
+            or "REINICIO" in tipo_n
+        )
+        if es_anomalia:
+            return "anomalia"
+
+        # 3. Geocercas no registradas / omitidas
         if "NO REGISTRADA" in estado or "FALTANTE" in geo or tipo_n == "OMITIDA":
             return "no_registrada"
-
-        # 3. Reinicio de ruta
-        if "REINICIO" in estado or "REINICIO" in tipo_n:
-            return "reinicio"
 
         # 4. Geocercas repetidas
         if "REPETIDA" in estado or "REPETIDA" in tipo_n:
             return "repetida"
 
-        # 5. Evaluación temporal
+        # 5. Evaluación de tiempo
         if "RETRASO" in evaluacion:
             return "retraso"
         if "ADELANTO" in evaluacion:
@@ -286,6 +294,8 @@ class VistaActividadGeocercas(ttk.Frame):
             text=f"{len(df_unidad)} registros procesados"
         )
 
+        # Pre-mapear columnas para optimizar el recorrido
+        mapa_cols = {col: self._obtener_columna(df_unidad, col) for col in self.columnas}
         col_estado = self._obtener_columna(df_unidad, "Estado_Ruta", "Estado Ruta")
         col_eval = self._obtener_columna(df_unidad, "Evaluacion_Tiempo", "Evaluacion Tiempo")
         col_tipo = self._obtener_columna(df_unidad, "Tipo")
@@ -305,9 +315,9 @@ class VistaActividadGeocercas(ttk.Frame):
             )
 
             valores = []
-            for columna in self.columnas:
-                col_real = self._obtener_columna(self.df_resultado, columna)
-                if col_real is None and columna == "Agrupación":
+            for col_nombre in self.columnas:
+                col_real = mapa_cols.get(col_nombre)
+                if col_real is None and col_nombre == "Agrupación":
                     col_real = col_unidad
 
                 valor = fila.get(col_real, "-") if col_real is not None else "-"

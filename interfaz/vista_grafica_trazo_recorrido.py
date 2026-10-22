@@ -1,3 +1,4 @@
+import re
 import tkinter as tk
 from tkinter import ttk
 import pandas as pd
@@ -87,7 +88,7 @@ class VistaGraficaTrazoRecorrido(ttk.Frame):
             3, PaletaColores.VERDE_EXITO
         )
         self.card_title_5, self.lbl_card_5 = self._crear_card_kpi(
-            self.frame_cards, "REINICIOS / CORTES", "0",
+            self.frame_cards, "ANOMALÍAS / CORTES", "0",
             4, "#8B5CF6"
         )
         self.card_title_6, self.lbl_card_6 = self._crear_card_kpi(
@@ -224,10 +225,10 @@ class VistaGraficaTrazoRecorrido(ttk.Frame):
             else pd.Series("", index=df_u.index)
         )
 
-        reinicios = estados.str.contains("Reinicio", case=False).sum()
+        anomalias = estados.str.contains("Anomalía|ANOMALÍA|Reinicio", case=False, regex=True).sum()
         cortes = estados.str.contains("CORTE", case=False).sum()
 
-        self.lbl_card_5.config(text=f"{reinicios} Rein. / {cortes} Cort.")
+        self.lbl_card_5.config(text=f"{anomalias} Anom. / {cortes} Cort.")
 
         desfases = (
             df_u["Desfase"].fillna("").astype(str)
@@ -267,7 +268,6 @@ class VistaGraficaTrazoRecorrido(ttk.Frame):
 
     @staticmethod
     def _segundos_desfase(valor):
-        import re
         coincidencia = re.search(r"(\d+)\s*m\s*(\d+)\s*s", str(valor))
         if coincidencia:
             return int(coincidencia.group(1)) * 60 + int(coincidencia.group(2))

@@ -41,7 +41,6 @@ class GraficoPaiUnidades(ttk.Frame):
         self.panel_detalle = tk.Frame(self, bg="#0F172A", bd=0, padx=15, pady=10)
         self.panel_detalle.pack(side="bottom", fill="x")
 
-        # Encabezado del panel
         self.lbl_titulo_detalle = tk.Label(
             self.panel_detalle,
             text="📌 DETALLE INTERACTIVO DE UNIDAD",
@@ -50,14 +49,23 @@ class GraficoPaiUnidades(ttk.Frame):
         )
         self.lbl_titulo_detalle.pack(anchor="w")
 
-        # Texto del detalle (font size cambiado de 9.5 a 9 entero)
         self.lbl_contenido_detalle = tk.Label(
             self.panel_detalle,
-            text="Haz clic sobre cualquier rebanada del gráfico (Omisión, Retraso, Adelanto, etc.) para consultar aquí el desglose completo.",
+            text="Haz clic sobre cualquier rebanada del gráfico (Omisión, Retraso, Adelanto, Anomalía, etc.) para consultar aquí el desglose completo.",
             bg="#0F172A", fg="#CBD5E1",
             font=("Segoe UI", 9), justify="left", wraplength=1200
         )
         self.lbl_contenido_detalle.pack(anchor="w", pady=(4, 2))
+
+    @staticmethod
+    def _formatear_min_seg(segundos: float) -> str:
+        """Formatea segundos a un formato legible de minutos y segundos."""
+        if pd.isna(segundos) or segundos <= 0:
+            return "0m 00s"
+        tot_seg = int(round(segundos))
+        minutos = tot_seg // 60
+        segs = tot_seg % 60
+        return f"{minutos}m {segs:02d}s"
 
     def _al_hacer_scroll(self, event):
         self.canvas_scroll.yview_scroll(int(-1 * (event.delta / 120)), "units")
@@ -109,6 +117,7 @@ class GraficoPaiUnidades(ttk.Frame):
             "Adelanto": 0,
             "Retraso": 0,
             "Omisión": 0,
+            "Anomalía": 0,
             "Corte Ruta": 0
         }
 
@@ -116,26 +125,32 @@ class GraficoPaiUnidades(ttk.Frame):
         total_segs_retraso = 0.0
 
         for _, r in df_u.iterrows():
-            eval_t = str(r.get("Evaluacion_Tiempo", ""))
-            estado = str(r.get("Estado_Ruta", ""))
-            tipo = str(r.get("Tipo", ""))
-            geo = str(r.get("Geocerca", ""))
+            eval_t = str(r.get("Evaluacion_Tiempo", "")).upper()
+            estado = str(r.get("Estado_Ruta", "")).upper()
+            tipo = str(r.get("Tipo", "")).upper()
+            geo = str(r.get("Geocerca", "")).strip()
             segs_ret = r.get("Segundos_Retraso", 0.0)
+
+            # 🚫 Omitir Geocercas Repetidas e Inicios de Ruta
+            if "REPETIDA" in tipo or "GEOCERCA REPETIDA" in estado or "INICIO DE RUTA" in estado or "INICIO DE RUTA" in tipo:
+                continue
 
             if isinstance(segs_ret, (int, float)) and segs_ret > 0:
                 total_segs_retraso += segs_ret
 
-            if "NO REGISTRADA" in estado or "Omitida" in tipo or "Faltante" in geo:
+            if "NO REGISTRADA" in estado or "OMITIDA" in tipo or "FALTANTE" in geo.upper():
                 conteos["Omisión"] += 1
                 geo_limpia = geo.replace("(Faltante)", "").strip()
                 geocercas_omitidas[geo_limpia] = geocercas_omitidas.get(geo_limpia, 0) + 1
-            elif "CORTE" in estado or "Corte" in tipo:
+            elif "ANOMALÍA" in estado or "ANOMALIA" in estado or "ANOMALÍA" in tipo or "REINICIO" in estado:
+                conteos["Anomalía"] += 1
+            elif "CORTE" in estado or "CORTE" in tipo:
                 conteos["Corte Ruta"] += 1
-            elif "Retraso" in eval_t:
+            elif "RETRASO" in eval_t:
                 conteos["Retraso"] += 1
-            elif "Adelanto" in eval_t:
+            elif "ADELANTO" in eval_t:
                 conteos["Adelanto"] += 1
-            elif "A Tiempo" in eval_t:
+            elif "A TIEMPO" in eval_t:
                 conteos["A Tiempo"] += 1
 
         labels, sizes, colors = [], [], []
@@ -144,6 +159,7 @@ class GraficoPaiUnidades(ttk.Frame):
             "Adelanto": "#F97316",
             "Retraso": "#EF4444",
             "Omisión": "#2563EB",
+            "Anomalía": "#6366F1",
             "Corte Ruta": "#8B5CF6"
         }
 
@@ -189,8 +205,8 @@ class GraficoPaiUnidades(ttk.Frame):
                         detalles_om = [f"• {g}: {cant} vez(ces)" for g, cant in geocercas_omitidas.items()]
                         texto = f"Total de Omisiones: {conteos['Omisión']}  |  Geocercas no registradas: " + (",  ".join(detalles_om) if detalles_om else "Sin registros específicos.")
                     elif cat_label == "Retraso":
-                        mins_tot = round(total_segs_retraso / 60.0, 1)
-                        texto = f"Total de Retrasos: {conteos['Retraso']} eventos.  |  Tiempo total acumulado en retrasos: +{mins_tot} minutos de desfase."
+                        fmt_retraso = self._formatear_min_seg(total_segs_retraso)
+                        texto = f"Total de Retrasos: {conteos['Retraso']} eventos.  |  Tiempo acumulado de retraso: +{fmt_retraso} de desfase."
                     else:
                         texto = f"Categoría: {cat_label}  |  Total de eventos registrados: {sizes[i]}"
 

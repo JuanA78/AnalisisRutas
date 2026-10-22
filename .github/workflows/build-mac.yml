@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-macOS:
-    runs-on: macos-latest
+    runs-on: macos-13
 
     steps:
     - name: Descargar código
@@ -26,7 +26,6 @@ jobs:
 
     - name: Convertir icono a .icns (Opcional)
       run: |
-        # Si tienes rutas_icono.ico, crea una copia básica para macOS o usa la imagen directamente
         mkdir -p icon.iconset
         sips -z 16 16     rutas_icono.ico --out icon.iconset/icon_16x16.png || true
         sips -z 32 32     rutas_icono.ico --out icon.iconset/icon_16x16@2x.png || true
@@ -36,6 +35,7 @@ jobs:
     - name: Compilar App con PyInstaller
       run: |
         pyinstaller --noconfirm --onedir --windowed \
+          --icon=rutas_icono.icns \
           --name="AnalizadorRutas" \
           --add-data "configuracion:configuracion" \
           --add-data "interfaz:interfaz" \
@@ -56,10 +56,10 @@ jobs:
           --hide-extension "AnalizadorRutas.app" \
           --app-drop-link 425 120 \
           "dist/AnalizadorRutas-Mac.dmg" \
-          "dist/AnalizadorRutas.app" || true
+          "dist/AnalizadorRutas.app"
 
     - name: Subir el instalador generado
       uses: actions/upload-artifact@v4
       with:
         name: AnalizadorRutas-Mac
-        path: dist/*.dmg
+        path: dist/AnalizadorRutas-Mac.dmg

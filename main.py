@@ -56,7 +56,7 @@ class VentanaPrincipal(tk.Tk):
         self.df_resultado_actual = pd.DataFrame()
         self.df_resumen_actual = pd.DataFrame()
 
-        # Diccionarios de Tiempos Editables con Marcadores de Sentido
+        # Diccionarios de Tiempos Editables
         self.tiempos_arbolito_ida = [
             (("La Cruz", "Centro"), tk.IntVar(value=17)),
             (("Centro", "Polo Norte"), tk.IntVar(value=8)),
@@ -91,7 +91,6 @@ class VentanaPrincipal(tk.Tk):
         contenedor = tk.Frame(self, bg=self.COLOR_FONDO)
         contenedor.pack(fill="both", expand=True)
 
-        # Panel lateral compacto (Ancho: 270px)
         self.panel_lateral = tk.Frame(contenedor, bg=self.COLOR_PANEL, width=270)
         self.panel_lateral.pack(side="left", fill="y", padx=(8, 4), pady=8)
         self.panel_lateral.pack_propagate(False)
@@ -103,32 +102,25 @@ class VentanaPrincipal(tk.Tk):
         self._crear_pestanas()
 
     def _crear_panel_lateral(self):
-        # Título
         tk.Label(
             self.panel_lateral, text="Analizador de Rutas",
             font=("Segoe UI", 13, "bold"), bg=self.COLOR_PANEL, fg=self.COLOR_TEXTO
         ).pack(anchor="w", padx=10, pady=(6, 4))
 
-        # Botones Carga
         self._crear_boton(self.panel_lateral, "📂 Cargar Geocercas", self.cargar_archivo_geocercas).pack(fill="x", padx=10, pady=2)
         self._crear_boton(self.panel_lateral, "🛰️ Cargar Actividad GPS", self.cargar_archivo_actividad).pack(fill="x", padx=10, pady=2)
 
-        # Selección de Ruta
         tk.Label(self.panel_lateral, text="Ruta de referencia", bg=self.COLOR_PANEL, fg=self.COLOR_TEXTO, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=10, pady=(4, 2))
         self.combo_ruta = ttk.Combobox(self.panel_lateral, values=["El Arbolito", "Agua Salada"], state="readonly", font=("Segoe UI", 9))
         self.combo_ruta.pack(fill="x", padx=10, pady=(0, 4))
         self.combo_ruta.set("El Arbolito")
         self.combo_ruta.bind("<<ComboboxSelected>>", self._al_cambiar_ruta)
 
-        # ------------------------------------------------------------
-        # 1. SECCIÓN TIEMPOS META (Sin expandir verticalmente sobrante)
-        # ------------------------------------------------------------
         self.frame_tiempos_container = tk.LabelFrame(
             self.panel_lateral, text=" Tiempos Meta (min) ", bg=self.COLOR_PANEL, fg="#38BDF8", font=("Segoe UI", 8, "bold")
         )
         self.frame_tiempos_container.pack(fill="x", expand=False, padx=10, pady=(2, 4))
 
-        # Canvas con altura exacta ajustada a los ítems (height=270)
         self.canvas_tiempos = tk.Canvas(self.frame_tiempos_container, bg=self.COLOR_PANEL, height=270, highlightthickness=0)
         self.scrollbar_tiempos = ttk.Scrollbar(self.frame_tiempos_container, orient="vertical", command=self.canvas_tiempos.yview)
         self.frame_tiempos_list = tk.Frame(self.canvas_tiempos, bg=self.COLOR_PANEL)
@@ -142,9 +134,6 @@ class VentanaPrincipal(tk.Tk):
 
         self._renderizar_tiempos_ruta()
 
-        # ------------------------------------------------------------
-        # 2. SECCIÓN UNIDADES DISPONIBLES (Aprovecha el espacio restante)
-        # ------------------------------------------------------------
         tk.Label(self.panel_lateral, text="Unidades disponibles", bg=self.COLOR_PANEL, fg=self.COLOR_TEXTO, font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=10, pady=(2, 1))
         
         contenedor_unidades = tk.Frame(self.panel_lateral, bg=self.COLOR_PANEL)
@@ -161,13 +150,11 @@ class VentanaPrincipal(tk.Tk):
         scrollbar.pack(side="right", fill="y")
         self.lista_unidades.configure(yscrollcommand=scrollbar.set)
 
-        # Botones de Selección
         btn_frame = tk.Frame(self.panel_lateral, bg=self.COLOR_PANEL)
         btn_frame.pack(fill="x", padx=10, pady=(0, 4))
         tk.Button(btn_frame, text="Todas", command=self.seleccionar_todas_unidades, bg="#334155", fg="white", font=("Segoe UI", 8), relief="flat").pack(side="left", fill="x", expand=True, padx=(0, 1))
         tk.Button(btn_frame, text="Limpiar", command=self.limpiar_seleccion_unidades, bg="#334155", fg="white", font=("Segoe UI", 8), relief="flat").pack(side="left", fill="x", expand=True, padx=(1, 0))
 
-        # Analizar y Exportar
         self._crear_boton(self.panel_lateral, "▶ Analizar Rutas", self.ejecutar_analisis).pack(fill="x", padx=10, pady=(2, 4))
         tk.Button(self.panel_lateral, text="📊 Exportar Resumen Excel", command=self.exportar_resumen, bg="#1E293B", fg="#38BDF8", font=("Segoe UI", 8, "bold"), relief="solid", bd=1).pack(fill="x", padx=10, pady=2)
         tk.Button(self.panel_lateral, text="📋 Exportar Detalle Excel", command=self.exportar_detalle, bg="#1E293B", fg="#38BDF8", font=("Segoe UI", 8, "bold"), relief="solid", bd=1).pack(fill="x", padx=10, pady=(2, 6))
@@ -187,13 +174,9 @@ class VentanaPrincipal(tk.Tk):
             lista_ida = self.tiempos_arbolito_ida
             lista_regreso = self.tiempos_arbolito_regreso
 
-        # Encabezado IDA
         tk.Label(
-            self.frame_tiempos_list, 
-            text="--- TRAYECTO IDA ---", 
-            bg=self.COLOR_PANEL, 
-            fg="#38BDF8", 
-            font=("Segoe UI", 8, "bold")
+            self.frame_tiempos_list, text="--- TRAYECTO IDA ---", 
+            bg=self.COLOR_PANEL, fg="#38BDF8", font=("Segoe UI", 8, "bold")
         ).pack(anchor="w", pady=(2, 1), padx=2)
 
         for (origen, destino), var in lista_ida:
@@ -201,36 +184,18 @@ class VentanaPrincipal(tk.Tk):
             row_f.pack(fill="x", pady=0, padx=2)
 
             lbl = f"{origen} ➔ {destino}"
-            tk.Label(
-                row_f, 
-                text=lbl, 
-                bg=self.COLOR_PANEL, 
-                fg="#F8FAFC", 
-                font=("Segoe UI", 8, "bold"),
-                anchor="w"
-            ).pack(side="left", fill="x", expand=True)
+            tk.Label(row_f, text=lbl, bg=self.COLOR_PANEL, fg="#F8FAFC", font=("Segoe UI", 8, "bold"), anchor="w").pack(side="left", fill="x", expand=True)
 
             spin = tk.Spinbox(
-                row_f, 
-                from_=1, 
-                to=120, 
-                textvariable=var, 
-                width=3, 
-                font=("Segoe UI", 8, "bold"), 
-                bg="#0F172A", 
-                fg="#FFFFFF", 
-                buttonbackground="#1E293B", 
-                relief="flat"
+                row_f, from_=1, to=120, textvariable=var, width=3, 
+                font=("Segoe UI", 8, "bold"), bg="#0F172A", fg="#FFFFFF", 
+                buttonbackground="#1E293B", relief="flat"
             )
             spin.pack(side="right")
 
-        # Encabezado REGRESO
         tk.Label(
-            self.frame_tiempos_list, 
-            text="--- TRAYECTO REGRESO ---", 
-            bg=self.COLOR_PANEL, 
-            fg="#38BDF8", 
-            font=("Segoe UI", 8, "bold")
+            self.frame_tiempos_list, text="--- TRAYECTO REGRESO ---", 
+            bg=self.COLOR_PANEL, fg="#38BDF8", font=("Segoe UI", 8, "bold")
         ).pack(anchor="w", pady=(5, 1), padx=2)
 
         for (origen, destino), var in lista_regreso:
@@ -238,26 +203,12 @@ class VentanaPrincipal(tk.Tk):
             row_f.pack(fill="x", pady=0, padx=2)
 
             lbl = f"{origen} ➔ {destino}"
-            tk.Label(
-                row_f, 
-                text=lbl, 
-                bg=self.COLOR_PANEL, 
-                fg="#F8FAFC", 
-                font=("Segoe UI", 8, "bold"),
-                anchor="w"
-            ).pack(side="left", fill="x", expand=True)
+            tk.Label(row_f, text=lbl, bg=self.COLOR_PANEL, fg="#F8FAFC", font=("Segoe UI", 8, "bold"), anchor="w").pack(side="left", fill="x", expand=True)
 
             spin = tk.Spinbox(
-                row_f, 
-                from_=1, 
-                to=120, 
-                textvariable=var, 
-                width=3, 
-                font=("Segoe UI", 8, "bold"), 
-                bg="#0F172A", 
-                fg="#FFFFFF", 
-                buttonbackground="#1E293B", 
-                relief="flat"
+                row_f, from_=1, to=120, textvariable=var, width=3, 
+                font=("Segoe UI", 8, "bold"), bg="#0F172A", fg="#FFFFFF", 
+                buttonbackground="#1E293B", relief="flat"
             )
             spin.pack(side="right")
 
@@ -289,9 +240,6 @@ class VentanaPrincipal(tk.Tk):
         self.vista_gps = VistaActividadDiariaGPS(self.tab_gps)
         self.vista_gps.pack(fill="both", expand=True)
 
-    # ------------------------------------------------------------
-    # EVENTOS DE ARCHIVOS Y SELECCIÓN
-    # ------------------------------------------------------------
     def cargar_archivo_geocercas(self):
         archivo = filedialog.askopenfilename(title="Seleccionar geocercas", filetypes=[("Archivos Excel", "*.xlsx *.xls")])
         if not archivo:
@@ -320,9 +268,11 @@ class VentanaPrincipal(tk.Tk):
         if not archivo:
             return
         try:
+            ruta_sel = self.combo_ruta.get()
             lector = LectorActividadGPS(archivo)
-            df = lector.cargar_datos()
+            df = lector.cargar_datos_completos(ruta_sel)
             if df is None or df.empty:
+                messagebox.showwarning("Sin datos", "No se encontraron registros para la ruta seleccionada.")
                 return
 
             self.lector_actividad = lector
@@ -362,9 +312,6 @@ class VentanaPrincipal(tk.Tk):
 
         return {par: var.get() for par, var in lista_completa}
 
-    # ------------------------------------------------------------
-    # EJECUTAR ANÁLISIS
-    # ------------------------------------------------------------
     def ejecutar_analisis(self):
         if self.lector_geocercas is None or self.df_geocercas_original.empty:
             messagebox.showwarning("Falta archivo", "Carga el archivo de geocercas.")
@@ -376,8 +323,30 @@ class VentanaPrincipal(tk.Tk):
             return
 
         try:
+            ruta_sel = self.combo_ruta.get()
+
+            # 1. Re-filtrar el DataFrame del GPS según la ruta y unidades seleccionadas
+            if self.lector_actividad is not None:
+                self.df_actividad_gps = self.lector_actividad.cargar_datos_completos(ruta_sel)
+                
+                # Filtrar solo por las unidades marcadas en el Listbox
+                if not self.df_actividad_gps.empty:
+                    col_unid = self.df_actividad_gps.columns[0]
+                    unids_norm = set(str(u).replace("-", "").replace(" ", "").upper() for u in unidades_sel)
+                    
+                    mask = self.df_actividad_gps[col_unid].apply(
+                        lambda x: str(x).replace("-", "").replace(" ", "").upper() in unids_norm
+                    )
+                    self.df_actividad_gps = self.df_actividad_gps[mask].reset_index(drop=True)
+
             df_unidades = self.lector_geocercas.obtener_datos_unidades(unidades_sel)
-            df_resultado = RutaService.analizar_unidades(df_unidades, tiempos_objetivo=self._obtener_tiempos_objetivo())
+            
+            # 🔴 CORRECCIÓN: Se pasa explícitamente nombre_ruta=ruta_sel al backend
+            df_resultado = RutaService.analizar_unidades(
+                df_unidades, 
+                tiempos_objetivo=self._obtener_tiempos_objetivo(),
+                nombre_ruta=ruta_sel
+            )
 
             if df_resultado is None or df_resultado.empty:
                 return
@@ -392,13 +361,16 @@ class VentanaPrincipal(tk.Tk):
             )
             self.df_resumen_actual = df_resumen_general.copy()
 
+            # 2. Cargar y forzar la actualización visual de todas las pestañas
             self.vista_resumen.cargar_datos(df_resumen_general, df_resultado)
             self.vista_detalle.cargar_datos(df_resultado)
             self.vista_graficas.cargar_datos(df_resultado)
-            self.vista_gps.cargar_datos(self.df_actividad_gps, unidades_sel)
+            
+            # REFRESCAR LA TABLA DE ACTIVIDAD GPS
+            self.vista_gps.cargar_datos(self.df_actividad_gps)
 
             self.notebook.select(self.tab_resumen)
-            messagebox.showinfo("Éxito", "Análisis completado correctamente.")
+            messagebox.showinfo("Éxito", f"Análisis de [{ruta_sel}] completado correctamente.")
         except Exception as e:
             messagebox.showerror("Error", f"Error en el análisis:\n{e}")
 
@@ -410,16 +382,13 @@ class VentanaPrincipal(tk.Tk):
             self.df_resumen_actual.to_excel(arch, index=False)
 
     def exportar_detalle(self):
-        """Exporta el detalle de rutas excluyendo Vuelta_Num, Sentido, Tipo, Evaluacion_Tiempo y Segundos_Retraso."""
         if self.df_resultado_actual.empty:
             return
         arch = filedialog.asksaveasfilename(defaultextension=".xlsx", initialfile="detalle_rutas.xlsx")
         if arch:
             df_exp = self.df_resultado_actual.copy()
-            
-            columnas_omitir = ["Vuelta_Num", "Sentido", "Tipo", "Evaluacion_Tiempo", "Segundos_Retraso","Hora de Salida"]
+            columnas_omitir = ["Vuelta_Num", "Sentido", "Tipo", "Evaluacion_Tiempo", "Segundos_Retraso", "Hora de Salida"]
             cols_exportar = [c for c in df_exp.columns if c not in columnas_omitir]
-            
             df_exp[cols_exportar].to_excel(arch, index=False)
 
 

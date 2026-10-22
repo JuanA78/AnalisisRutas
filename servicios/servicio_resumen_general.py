@@ -1,15 +1,14 @@
 import pandas as pd
-from servicios.servicio_actividad_gps import ServicioActividadGPS
 
 
 class ServicioResumenGeneral:
-    """Consolida las métricas del Resumen General delegando cada cálculo a su servicio correspondiente."""
+    """Consolida las métricas del Resumen General cruzando geocercas y actividad GPS."""
 
     @staticmethod
     def _normalizar_id(texto) -> str:
         if pd.isna(texto):
             return ""
-        return str(texto).replace("-", "").strip().upper()
+        return str(texto).replace("-", "").replace(" ", "").strip().upper()
 
     @classmethod
     def preparar_resumen_general(
@@ -19,8 +18,8 @@ class ServicioResumenGeneral:
         df_actividad_gps: pd.DataFrame = None
     ) -> pd.DataFrame:
         """
-        Consolida la tabla del Resumen General con la columna Min. Retraso Acum.
-        y la Velocidad Máxima real enviada por ServicioActividadGPS.
+        Consolida la tabla del Resumen General vinculando las métricas de geocercas
+        con las lecturas por posición física de LectorActividadGPS.
         """
         columnas_finales = [
             "Unidad", "Hora Inicio", "Hora Término", "Tiempo Total",
@@ -33,7 +32,7 @@ class ServicioResumenGeneral:
 
         resumen = df_resumen_diario.copy()
 
-        # Normalizar nombres de columnas principales
+        # Normalizar encabezados principales
         equivalencias = {
             "Agrupación": "Unidad",
             "Agrupacion": "Unidad",
@@ -47,13 +46,17 @@ class ServicioResumenGeneral:
         if "Unidad" not in resumen.columns:
             resumen["Unidad"] = ""
 
-        # Inicializar contadores
+        # Inicializar contadores predeterminados
         resumen["A Tiempo"] = 0
         resumen["Retrasos"] = 0
         resumen["Adelantos"] = 0
         resumen["Omisiones"] = 0
         resumen["Min. Retraso Acum."] = "0m"
+        resumen["Km Actividad Diaria"] = "-"
+        resumen["Velocidad Máx."] = "-"
+        resumen["Tiempo Viajes GPS"] = "-"
 
+        # 1. Mapeo de datos procesados de Geocercas
         if df_resultado_geocercas is not None and not df_resultado_geocercas.empty and "Agrupación" in df_resultado_geocercas.columns:
             col_agrupa = "Agrupación"
 
@@ -93,20 +96,42 @@ class ServicioResumenGeneral:
                     segundos = int(total_segundos % 60)
                     resumen.at[idx, "Min. Retraso Acum."] = f"{minutos}m {segundos}s" if segundos > 0 else f"{minutos}m"
 
-      # Métricas desde ServicioActividadGPS
-        metricas_gps = ServicioActividadGPS.obtener_metricas_resumen(df_actividad_gps)
+        # 2. Emparejamiento directo con el DataFrame de Actividad GPS
+        if df_actividad_gps is not None and not df_actividad_gps.empty:
+            col_gps_unid = df_actividad_gps.columns[0]  # Posición 0: Agrupación/Grouping
 
-        for idx, fila in resumen.iterrows():
-            u_norm = cls._normalizar_id(fila["Unidad"])
-            if u_norm in metricas_gps:
-                datos_gps = metricas_gps[u_norm]
-                
-                # Asignación directa e incondicional desde el reporte GPS
-                resumen.at[idx, "Km Actividad Diaria"] = datos_gps["km"]
-                resumen.at[idx, "Velocidad Máx."] = datos_gps["velocidad_max"]
-                resumen.at[idx, "Tiempo Viajes GPS"] = datos_gps["tiempo_viajes"]
+            for idx, fila in resumen.iterrows():
+                u_norm = cls._normalizar_id(fila["Unidad"])
+                if not u_norm:
+                    continue
 
-        # Garantizar valores por defecto (-) si alguna columna quedó vacía o ausente
+                # Filtrar la fila correspondiente en el DataFrame del GPS
+                match_gps = df_actividad_gps[
+                    df_actividad_gps[col_gps_unid].apply(
+                        lambda val: u_norm in cls._normalizar_id(val) or cls._normalizar_id(val) in u_norm
+                    )
+                ]
+
+                if not match_gps.empty:
+                    f_gps = match_gps.iloc[0]
+
+                    # Mapeo por columna de LectorActividadGPS
+                    if "Kilometraje" in match_gps.columns:
+                        resumen.at[idx, "Km Actividad Diaria"] = f_gps["Kilometraje"]
+                    elif len(match_gps.columns) > 2:
+                        resumen.at[idx, "Km Actividad Diaria"] = f_gps.iloc[2]
+
+                    if "Velocidad Máxima" in match_gps.columns:
+                        resumen.at[idx, "Velocidad Máx."] = f_gps["Velocidad Máxima"]
+                    elif len(match_gps.columns) > 4:
+                        resumen.at[idx, "Velocidad Máx."] = f_gps.iloc[4]
+
+                    if "Tiempo en viajes" in match_gps.columns:
+                        resumen.at[idx, "Tiempo Viajes GPS"] = f_gps["Tiempo en viajes"]
+                    elif len(match_gps.columns) > 5:
+                        resumen.at[idx, "Tiempo Viajes GPS"] = f_gps.iloc[5]
+
+        # Garantizar llenado por defecto en caso de valores vacíos
         for col in columnas_finales:
             if col not in resumen.columns:
                 resumen[col] = "-"

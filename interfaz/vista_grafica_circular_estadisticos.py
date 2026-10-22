@@ -60,7 +60,7 @@ class VistaGraficaCircularEstadisticos(ttk.Frame):
         self.grafica_pastel.renderizar_pie_charts(self.df_resultado)
 
     def _generar_figura_maestra_unidades(self) -> plt.Figure:
-        """Genera una figura unificada de Matplotlib con todas las unidades en retícula."""
+        """Genera una figura unificada de Matplotlib para exportar a PDF."""
         col_unidad = next((c for c in self.df_resultado.columns if "AGRUPA" in c.upper() or "UNIDAD" in c.upper()), None)
         if not col_unidad:
             return None
@@ -72,10 +72,8 @@ class VistaGraficaCircularEstadisticos(ttk.Frame):
         COLUMNAS = 3
         filas = (len(unidades) + COLUMNAS - 1) // COLUMNAS
 
-        # Crear figura global ajustando altura proporcional a la cantidad de filas
         fig, axes = plt.subplots(filas, COLUMNAS, figsize=(11, 3.5 * filas), dpi=150, facecolor="#FFFFFF")
         
-        # Normalizar matriz de ejes
         if filas == 1 and COLUMNAS == 1:
             axes = [axes]
         elif filas == 1 or COLUMNAS == 1:
@@ -88,6 +86,7 @@ class VistaGraficaCircularEstadisticos(ttk.Frame):
             "Adelanto": "#F97316",
             "Retraso": "#EF4444",
             "Omisión": "#2563EB",
+            "Anomalía": "#6366F1",
             "Corte Ruta": "#8B5CF6"
         }
 
@@ -96,24 +95,30 @@ class VistaGraficaCircularEstadisticos(ttk.Frame):
             df_u = self.df_resultado[self.df_resultado[col_unidad].astype(str) == unidad_id]
 
             conteos = {
-                "A Tiempo": 0, "Adelanto": 0, "Retraso": 0, "Omisión": 0, "Corte Ruta": 0
+                "A Tiempo": 0, "Adelanto": 0, "Retraso": 0, "Omisión": 0, "Anomalía": 0, "Corte Ruta": 0
             }
 
             for _, r in df_u.iterrows():
-                eval_t = str(r.get("Evaluacion_Tiempo", ""))
-                estado = str(r.get("Estado_Ruta", ""))
-                tipo = str(r.get("Tipo", ""))
-                geo = str(r.get("Geocerca", ""))
+                eval_t = str(r.get("Evaluacion_Tiempo", "")).upper()
+                estado = str(r.get("Estado_Ruta", "")).upper()
+                tipo = str(r.get("Tipo", "")).upper()
+                geo = str(r.get("Geocerca", "")).strip()
 
-                if "NO REGISTRADA" in estado or "Omitida" in tipo or "Faltante" in geo:
+                # 🚫 Omitir Geocercas Repetidas e Inicios de Ruta
+                if "REPETIDA" in tipo or "GEOCERCA REPETIDA" in estado or "INICIO DE RUTA" in estado or "INICIO DE RUTA" in tipo:
+                    continue
+
+                if "NO REGISTRADA" in estado or "OMITIDA" in tipo or "FALTANTE" in geo.upper():
                     conteos["Omisión"] += 1
-                elif "CORTE" in estado or "Corte" in tipo:
+                elif "ANOMALÍA" in estado or "ANOMALIA" in estado or "ANOMALÍA" in tipo or "REINICIO" in estado:
+                    conteos["Anomalía"] += 1
+                elif "CORTE" in estado or "CORTE" in tipo:
                     conteos["Corte Ruta"] += 1
-                elif "Retraso" in eval_t:
+                elif "RETRASO" in eval_t:
                     conteos["Retraso"] += 1
-                elif "Adelanto" in eval_t:
+                elif "ADELANTO" in eval_t:
                     conteos["Adelanto"] += 1
-                elif "A Tiempo" in eval_t:
+                elif "A TIEMPO" in eval_t:
                     conteos["A Tiempo"] += 1
 
             labels, sizes, colors_list = [], [], []
@@ -138,7 +143,6 @@ class VistaGraficaCircularEstadisticos(ttk.Frame):
 
             ax.set_title(f"UNIDAD: {unidad_id}", color="#0F172A", fontsize=9, fontweight="bold", pad=6)
 
-        # Ocultar ejes vacíos de la cuadrícula si los hay
         for j in range(len(unidades), len(axes)):
             axes[j].axis("off")
 
@@ -167,14 +171,12 @@ class VistaGraficaCircularEstadisticos(ttk.Frame):
         ruta_img_temp = None
         figura_maestra = None
         try:
-            # 1. Generar la figura unificada en memoria
             figura_maestra = self._generar_figura_maestra_unidades()
 
             if figura_maestra is None:
                 messagebox.showerror("Error", "No se pudieron procesar las gráficas de las unidades.")
                 return
 
-            # 2. Guardar la figura maesra en un archivo temporal de alta resolución
             temp_dir = tempfile.gettempdir()
             ruta_img_temp = os.path.join(temp_dir, "grafica_maestra_pie_temp.png")
 
@@ -187,7 +189,6 @@ class VistaGraficaCircularEstadisticos(ttk.Frame):
             )
             plt.close(figura_maestra)
 
-            # 3. Construir el documento con ReportLab
             doc = SimpleDocTemplate(
                 archivo_dest,
                 pagesize=letter,
@@ -209,11 +210,10 @@ class VistaGraficaCircularEstadisticos(ttk.Frame):
             )
 
             elementos = [
-                Paragraph("Graficas De Cumplimiento Por Unidad", titulo_style),
+                Paragraph("Gráficas De Cumplimiento Por Unidad", titulo_style),
                 Spacer(1, 10)
             ]
 
-            # 4. Insertar imagen ajustada
             ancho_pag_util = 540
             alto_proporcional = min(680, int(ancho_pag_util * (figura_maestra.get_size_inches()[1] / figura_maestra.get_size_inches()[0])))
 
