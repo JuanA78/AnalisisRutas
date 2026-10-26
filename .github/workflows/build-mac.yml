@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-macOS:
-    runs-on: macos-13
+    runs-on: macos-latest
 
     steps:
     - name: Descargar código
@@ -21,20 +21,29 @@ jobs:
     - name: Instalar dependencias
       run: |
         python -m pip install --upgrade pip
-        pip install pyinstaller
+        pip install pyinstaller pillow
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-    - name: Convertir icono a .icns (Opcional)
+    - name: Generar icono .icns válido
       run: |
-        mkdir -p icon.iconset
-        sips -z 16 16     rutas_icono.ico --out icon.iconset/icon_16x16.png || true
-        sips -z 32 32     rutas_icono.ico --out icon.iconset/icon_16x16@2x.png || true
-        sips -z 128 128   rutas_icono.ico --out icon.iconset/icon_128x128.png || true
+        python -c "
+        from PIL import Image
+        import os
+
+        if os.path.exists('rutas_icono.ico'):
+            img = Image.open('rutas_icono.ico')
+            os.makedirs('icon.iconset', exist_ok=True)
+            sizes = [16, 32, 128, 256, 512]
+            for s in sizes:
+                img.resize((s, s)).save(f'icon.iconset/icon_{s}x{s}.png')
+                img.resize((s*2, s*2)).save(f'icon.iconset/icon_{s}x{s}@2x.png')
+        "
         iconutil -c icns icon.iconset -o rutas_icono.icns || true
 
     - name: Compilar App con PyInstaller
       run: |
         pyinstaller --noconfirm --onedir --windowed \
+          --target-architecture universal2 \
           --icon=rutas_icono.icns \
           --name="AnalizadorRutas" \
           --add-data "configuracion:configuracion" \
@@ -47,16 +56,32 @@ jobs:
     - name: Crear instalador .dmg
       run: |
         brew install create-dmg
-        create-dmg \
-          --volname "Instalador AnalizadorRutas" \
-          --window-pos 200 120 \
-          --window-size 600 400 \
-          --icon-size 100 \
-          --icon "AnalizadorRutas.app" 175 120 \
-          --hide-extension "AnalizadorRutas.app" \
-          --app-drop-link 425 120 \
-          "dist/AnalizadorRutas-Mac.dmg" \
-          "dist/AnalizadorRutas.app"
+        
+        # Generar dmg con icono
+        if [ -f rutas_icono.icns ]; then
+          create-dmg \
+            --volname "Instalador AnalizadorRutas" \
+            --volicon "rutas_icono.icns" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "AnalizadorRutas.app" 175 120 \
+            --hide-extension "AnalizadorRutas.app" \
+            --app-drop-link 425 120 \
+            "dist/AnalizadorRutas-Mac.dmg" \
+            "dist/AnalizadorRutas.app"
+        else
+          create-dmg \
+            --volname "Instalador AnalizadorRutas" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "AnalizadorRutas.app" 175 120 \
+            --hide-extension "AnalizadorRutas.app" \
+            --app-drop-link 425 120 \
+            "dist/AnalizadorRutas-Mac.dmg" \
+            "dist/AnalizadorRutas.app"
+        fi
 
     - name: Subir el instalador generado
       uses: actions/upload-artifact@v4
