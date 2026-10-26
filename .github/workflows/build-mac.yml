@@ -27,16 +27,7 @@ jobs:
     - name: Convertir icono a .icns (Opcional)
       run: |
         if [ -f rutas_icono.ico ]; then
-          python -c "
-          from PIL import Image
-          import os
-          img = Image.open('rutas_icono.ico')
-          os.makedirs('icon.iconset', exist_ok=True)
-          sizes = [16, 32, 128, 256, 512]
-          for s in sizes:
-              img.resize((s, s)).save(f'icon.iconset/icon_{s}x{s}.png')
-              img.resize((s*2, s*2)).save(f'icon.iconset/icon_{s}x{s}@2x.png')
-          "
+          python -c "from PIL import Image; import os; img = Image.open('rutas_icono.ico'); os.makedirs('icon.iconset', exist_ok=True); [img.resize((s, s)).save(f'icon.iconset/icon_{s}x{s}.png') for s in [16, 32, 128, 256, 512]]; [img.resize((s*2, s*2)).save(f'icon.iconset/icon_{s}x{s}@2x.png') for s in [16, 32, 128, 256, 512]]"
           iconutil -c icns icon.iconset -o rutas_icono.icns || true
         fi
 
