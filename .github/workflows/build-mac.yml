@@ -13,19 +13,17 @@ jobs:
     - name: Descargar código
       uses: actions/checkout@v4
 
-    - name: Configurar Python
+    - name: Configurar Python x86_64 (Intel)
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
+        architecture: 'x64'
 
-    - name: Instalar dependencias puras x86_64 (Intel)
+    - name: Instalar dependencias
       run: |
         python -m pip install --upgrade pip
-        # Forzamos a pip a descargar wheels exclusivamente para macosx x86_64
-        pip install --only-binary=:all: --platform macosx_10_13_x86_64 --target $(python -c "import site; print(site.getsitepackages()[0])") pyinstaller pillow --upgrade || pip install pyinstaller pillow
-        if [ -f requirements.txt ]; then 
-          pip install --only-binary=:all: --platform macosx_10_13_x86_64 --target $(python -c "import site; print(site.getsitepackages()[0])") -r requirements.txt --upgrade || pip install -r requirements.txt
-        fi
+        pip install pyinstaller pillow
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
     - name: Convertir icono a .icns (Opcional)
       run: |
@@ -43,16 +41,15 @@ jobs:
           iconutil -c icns icon.iconset -o rutas_icono.icns || true
         fi
 
-    - name: Compilar App con PyInstaller para Intel
+    - name: Compilar App con PyInstaller
       run: |
         ICON_OPTION=""
         if [ -f rutas_icono.icns ]; then
           ICON_OPTION="--icon=rutas_icono.icns"
         fi
 
-        pyinstaller --noconfirm --onedir --windowed \
+        python -m PyInstaller --noconfirm --onedir --windowed \
           $ICON_OPTION \
-          --target-architecture x86_64 \
           --name="AnalizadorRutas" \
           --add-data "configuracion:configuracion" \
           --add-data "interfaz:interfaz" \
