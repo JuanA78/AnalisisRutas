@@ -18,13 +18,16 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Instalar dependencias
+    - name: Instalar dependencias puras x86_64 (Intel)
       run: |
         python -m pip install --upgrade pip
-        pip install pyinstaller
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        # Forzamos a pip a descargar wheels exclusivamente para macosx x86_64
+        pip install --only-binary=:all: --platform macosx_10_13_x86_64 --target $(python -c "import site; print(site.getsitepackages()[0])") pyinstaller pillow --upgrade || pip install pyinstaller pillow
+        if [ -f requirements.txt ]; then 
+          pip install --only-binary=:all: --platform macosx_10_13_x86_64 --target $(python -c "import site; print(site.getsitepackages()[0])") -r requirements.txt --upgrade || pip install -r requirements.txt
+        fi
 
-    - name: Convertir icono a .icns
+    - name: Convertir icono a .icns (Opcional)
       run: |
         if [ -f rutas_icono.ico ]; then
           mkdir -p icon.iconset
@@ -40,7 +43,7 @@ jobs:
           iconutil -c icns icon.iconset -o rutas_icono.icns || true
         fi
 
-    - name: Compilar App con PyInstaller para Intel (x86_64)
+    - name: Compilar App con PyInstaller para Intel
       run: |
         ICON_OPTION=""
         if [ -f rutas_icono.icns ]; then
