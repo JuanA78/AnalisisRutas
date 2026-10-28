@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-macOS:
-    runs-on: macos-14
+    runs-on: macos-latest
 
     steps:
     - name: Descargar código
@@ -24,11 +24,10 @@ jobs:
         pip install pyinstaller
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-    - name: Convertir icono a .icns usando herramientas nativas de Mac
+    - name: Convertir icono a .icns
       run: |
         if [ -f rutas_icono.ico ]; then
           mkdir -p icon.iconset
-          # sips convierte la imagen usando el sistema nativo de macOS
           sips -s format png rutas_icono.ico --out icon.iconset/icon_128x128.png || true
           sips -z 16 16     icon.iconset/icon_128x128.png --out icon.iconset/icon_16x16.png || true
           sips -z 32 32     icon.iconset/icon_128x128.png --out icon.iconset/icon_16x16@2x.png || true
