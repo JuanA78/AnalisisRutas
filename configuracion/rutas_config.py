@@ -49,11 +49,11 @@ class RutasConfig:
         ("Centro ➔ Polo Norte", "8"),
         ("Polo Norte ➔ Iberia", "5"),
         ("Iberia ➔ CTM", "13"),
-        ("CTM ➔ Gavilan", "10"),
+        ("CTM ➔ Gavilan", "3"),
     ]
 
     TIEMPOS_ARBOLITO_REGRESO = [
-        ("Gavilan ➔ CTM", "10"),
+        ("Gavilan ➔ CTM", "3"),
         ("CTM ➔ Iberia", "3"),
         ("Iberia ➔ Polo Norte", "5"),
         ("Polo Norte ➔ Centro", "12"),

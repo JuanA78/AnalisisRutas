@@ -75,11 +75,11 @@ class VentanaPrincipal(tk.Tk):
             (("Centro", "Polo Norte"), tk.IntVar(value=8)),
             (("Polo Norte", "Iberia"), tk.IntVar(value=5)),
             (("Iberia", "CTM"), tk.IntVar(value=13)),
-            (("CTM", "Gavilan"), tk.IntVar(value=10)),
+            (("CTM", "Gavilan"), tk.IntVar(value=3)),
         ]
 
         self.tiempos_arbolito_regreso = [
-            (("Gavilan", "CTM"), tk.IntVar(value=10)),
+            (("Gavilan", "CTM"), tk.IntVar(value=3)),
             (("CTM", "Iberia"), tk.IntVar(value=3)),
             (("Iberia", "Polo Norte"), tk.IntVar(value=5)),
             (("Polo Norte", "Centro"), tk.IntVar(value=12)),
@@ -477,6 +477,14 @@ class VentanaPrincipal(tk.Tk):
         self.notebook = ttk.Notebook(self.panel_principal)
         self.notebook.pack(fill="both", expand=True)
 
+        self.tab_gps = ttk.Frame(self.notebook)
+        self.notebook.add(
+            self.tab_gps,
+            text="Actividad diaria GPS"
+        )
+        self.vista_gps = VistaActividadDiariaGPS(self.tab_gps)
+        self.vista_gps.pack(fill="both", expand=True)
+
         self.tab_resumen = ttk.Frame(self.notebook)
         self.notebook.add(
             self.tab_resumen,
@@ -484,14 +492,6 @@ class VentanaPrincipal(tk.Tk):
         )
         self.vista_resumen = VistaResumenGeneral(self.tab_resumen)
         self.vista_resumen.pack(fill="both", expand=True)
-
-        self.tab_detalle = ttk.Frame(self.notebook)
-        self.notebook.add(
-            self.tab_detalle,
-            text="Detalle de rutas"
-        )
-        self.vista_detalle = VistaActividadGeocercas(self.tab_detalle)
-        self.vista_detalle.pack(fill="both", expand=True)
 
         self.tab_graficas = ttk.Frame(self.notebook)
         self.notebook.add(
@@ -501,14 +501,13 @@ class VentanaPrincipal(tk.Tk):
         self.vista_graficas = VistaGraficasContenedor(self.tab_graficas)
         self.vista_graficas.pack(fill="both", expand=True)
 
-        self.tab_gps = ttk.Frame(self.notebook)
+        self.tab_detalle = ttk.Frame(self.notebook)
         self.notebook.add(
-            self.tab_gps,
-            text="Actividad diaria GPS"
-        )
-        self.vista_gps = VistaActividadDiariaGPS(self.tab_gps)
-        self.vista_gps.pack(fill="both", expand=True)
-
+            self.tab_detalle,
+            text="Detalle de rutas"
+                )
+        self.vista_detalle = VistaActividadGeocercas(self.tab_detalle)
+        self.vista_detalle.pack(fill="both", expand=True)
     # ========================================================
     # CARGAR GEOCERCAS
     # ========================================================
@@ -785,7 +784,7 @@ class VentanaPrincipal(tk.Tk):
             self.vista_graficas.cargar_datos(df_resultado)
             self.vista_gps.cargar_datos(self.df_actividad_gps)
 
-            self.notebook.select(self.tab_resumen)
+            self.notebook.select(self.tab_gps)
 
             messagebox.showinfo(
                 "Éxito",
