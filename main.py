@@ -9,9 +9,19 @@ import pandas as pd
 warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 
 # ------------------------------------------------------------
-# CONFIGURACIÓN DE RUTAS
+# CONFIGURACIÓN DE RUTAS Y RECURSOS (COMPATIBLE CON PYINSTALLER)
 # ------------------------------------------------------------
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+def obtener_ruta_recurso(ruta_relativa=""):
+    """ Obtiene la ruta absoluta para recursos, compatible con PyInstaller en macOS """
+    try:
+        # PyInstaller crea una carpeta temporal al empaquetar y almacena la ruta en _MEIPASS
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+
+    return os.path.join(base_path, ruta_relativa)
+
+BASE_DIR = obtener_ruta_recurso()
 
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)

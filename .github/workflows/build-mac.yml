@@ -13,7 +13,7 @@ jobs:
     - name: Descargar código
       uses: actions/checkout@v4
 
-    - name: Configurar Python x86_64
+    - name: Configurar Python x86_64 (Intel)
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
@@ -41,7 +41,7 @@ jobs:
           iconutil -c icns icon.iconset -o rutas_icono.icns || true
         fi
 
-    - name: Compilar App con PyInstaller
+    - name: Compilar App con PyInstaller para Intel
       run: |
         ICON_OPTION=""
         if [ -f rutas_icono.icns ]; then
