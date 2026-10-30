@@ -22,10 +22,12 @@ jobs:
     - name: Instalar dependencias x86_64 (Intel)
       run: |
         python -m pip install --upgrade pip
-        # Forzamos la descarga de wheels exclusivas para la arquitectura x86_64 (Intel)
-        python -m pip install --only-binary=:all: --platform macosx_10_13_x86_64 pyinstaller pillow
+        # Instalar PyInstaller y Pillow especificando la ruta target de site-packages
+        PYTHON_SITE=$(python -c "import site; print(site.getsitepackages()[0])")
+        python -m pip install --only-binary=:all: --platform macosx_10_13_x86_64 --target "$PYTHON_SITE" pyinstaller pillow --upgrade
+        
         if [ -f requirements.txt ]; then 
-          python -m pip install --only-binary=:all: --platform macosx_10_13_x86_64 -r requirements.txt || python -m pip install -r requirements.txt
+          python -m pip install --only-binary=:all: --platform macosx_10_13_x86_64 --target "$PYTHON_SITE" -r requirements.txt --upgrade || python -m pip install -r requirements.txt
         fi
 
     - name: Convertir icono a .icns (Opcional)
