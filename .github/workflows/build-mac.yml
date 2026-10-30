@@ -19,15 +19,12 @@ jobs:
         python-version: '3.11'
         architecture: 'x64'
 
-    - name: Instalar dependencias x86_64 (Intel)
+    - name: Instalar dependencias
       run: |
         python -m pip install --upgrade pip
-        # Instalar PyInstaller y Pillow especificando la ruta target de site-packages
-        PYTHON_SITE=$(python -c "import site; print(site.getsitepackages()[0])")
-        python -m pip install --only-binary=:all: --platform macosx_10_13_x86_64 --target "$PYTHON_SITE" pyinstaller pillow --upgrade
-        
+        python -m pip install pyinstaller pillow
         if [ -f requirements.txt ]; then 
-          python -m pip install --only-binary=:all: --platform macosx_10_13_x86_64 --target "$PYTHON_SITE" -r requirements.txt --upgrade || python -m pip install -r requirements.txt
+          python -m pip install -r requirements.txt
         fi
 
     - name: Convertir icono a .icns (Opcional)
@@ -46,7 +43,7 @@ jobs:
           iconutil -c icns icon.iconset -o rutas_icono.icns || true
         fi
 
-    - name: Compilar App con PyInstaller
+    - name: Compilar App con PyInstaller para Intel
       run: |
         ICON_OPTION=""
         if [ -f rutas_icono.icns ]; then
@@ -55,6 +52,7 @@ jobs:
 
         python -m PyInstaller --noconfirm --onedir --windowed \
           $ICON_OPTION \
+          --target-architecture x86_64 \
           --name="AnalizadorRutas" \
           --add-data "configuracion:configuracion" \
           --add-data "interfaz:interfaz" \
