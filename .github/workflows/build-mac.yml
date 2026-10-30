@@ -7,17 +7,18 @@ on:
 
 jobs:
   build-macOS:
-    runs-on: macos-latest
+    # Usamos macos-13 porque es un runner con procesador Intel x86_64 nativo.
+    # Esto elimina de raíz cualquier conflicto de arquitectura con PyInstaller y Pillow.
+    runs-on: macos-13
 
     steps:
     - name: Descargar código
       uses: actions/checkout@v4
 
-    - name: Configurar Python x86_64 (Intel)
+    - name: Configurar Python (Intel Native)
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-        architecture: 'x64'
 
     - name: Instalar dependencias
       run: |
@@ -43,7 +44,7 @@ jobs:
           iconutil -c icns icon.iconset -o rutas_icono.icns || true
         fi
 
-    - name: Compilar App con PyInstaller para Intel
+    - name: Compilar App con PyInstaller
       run: |
         ICON_OPTION=""
         if [ -f rutas_icono.icns ]; then
@@ -52,7 +53,6 @@ jobs:
 
         python -m PyInstaller --noconfirm --onedir --windowed \
           $ICON_OPTION \
-          --target-architecture x86_64 \
           --name="AnalizadorRutas" \
           --add-data "configuracion:configuracion" \
           --add-data "interfaz:interfaz" \
