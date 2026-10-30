@@ -7,25 +7,25 @@ on:
 
 jobs:
   build-macOS:
-    # Usamos macos-13 porque es un runner con procesador Intel x86_64 nativo.
-    # Esto elimina de raíz cualquier conflicto de arquitectura con PyInstaller y Pillow.
-    runs-on: macos-13
+    runs-on: macos-latest
 
     steps:
     - name: Descargar código
       uses: actions/checkout@v4
 
-    - name: Configurar Python (Intel Native)
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-
-    - name: Instalar dependencias
+    - name: Descargar e instalar Python Universal2 (Intel + ARM)
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install pyinstaller pillow
+        # Descargamos e instalamos el paquete oficial de Python.org que contiene binarios x86_64 nativos
+        curl -O https://www.python.org/ftp/python/3.11.8/python-3.11.8-macos11.pkg
+        sudo installer -pkg python-3.11.8-macos11.pkg -target /
+
+    - name: Instalar dependencias para Intel (x86_64)
+      run: |
+        # Forzamos la ejecucion bajo la arquitectura x86_64
+        arch -x86_64 /Library/Frameworks/Python.framework/Versions/3.11/bin/python3.11 -m pip install --upgrade pip
+        arch -x86_64 /Library/Frameworks/Python.framework/Versions/3.11/bin/python3.11 -m pip install pyinstaller pillow
         if [ -f requirements.txt ]; then 
-          python -m pip install -r requirements.txt
+          arch -x86_64 /Library/Frameworks/Python.framework/Versions/3.11/bin/python3.11 -m pip install -r requirements.txt
         fi
 
     - name: Convertir icono a .icns (Opcional)
@@ -44,15 +44,17 @@ jobs:
           iconutil -c icns icon.iconset -o rutas_icono.icns || true
         fi
 
-    - name: Compilar App con PyInstaller
+    - name: Compilar App con PyInstaller para Intel
       run: |
         ICON_OPTION=""
         if [ -f rutas_icono.icns ]; then
           ICON_OPTION="--icon=rutas_icono.icns"
         fi
 
-        python -m PyInstaller --noconfirm --onedir --windowed \
+        # Ejecutamos PyInstaller forzado bajo x86_64 con el Python oficial Universal2
+        arch -x86_64 /Library/Frameworks/Python.framework/Versions/3.11/bin/python3.11 -m PyInstaller --noconfirm --onedir --windowed \
           $ICON_OPTION \
+          --target-architecture x86_64 \
           --name="AnalizadorRutas" \
           --add-data "configuracion:configuracion" \
           --add-data "interfaz:interfaz" \
