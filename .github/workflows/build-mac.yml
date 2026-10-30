@@ -13,23 +13,17 @@ jobs:
     - name: Descargar código
       uses: actions/checkout@v4
 
-    - name: Configurar entorno x86_64 (Intel)
-      run: |
-        # Instalar Python nativo para x86_64 via Homebrew usando Rosetta
-        arch -x86_64 /bin/bash -c "
-          if ! command -v brew &> /dev/null; then
-            /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"
-          fi
-        "
-        arch -x86_64 brew install python@3.11 || true
+    - name: Configurar Python x86_64
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        architecture: 'x64'
 
-    - name: Instalar dependencias en arquitectura x86_64
+    - name: Instalar dependencias
       run: |
-        arch -x86_64 python3.11 -m pip install --upgrade pip
-        arch -x86_64 python3.11 -m pip install pyinstaller pillow
-        if [ -f requirements.txt ]; then 
-          arch -x86_64 python3.11 -m pip install -r requirements.txt
-        fi
+        python -m pip install --upgrade pip
+        python -m pip install pyinstaller pillow
+        if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; fi
 
     - name: Convertir icono a .icns (Opcional)
       run: |
@@ -47,14 +41,14 @@ jobs:
           iconutil -c icns icon.iconset -o rutas_icono.icns || true
         fi
 
-    - name: Compilar App con PyInstaller para Intel
+    - name: Compilar App con PyInstaller
       run: |
         ICON_OPTION=""
         if [ -f rutas_icono.icns ]; then
           ICON_OPTION="--icon=rutas_icono.icns"
         fi
 
-        arch -x86_64 python3.11 -m PyInstaller --noconfirm --onedir --windowed \
+        python -m PyInstaller --noconfirm --onedir --windowed \
           $ICON_OPTION \
           --target-architecture x86_64 \
           --name="AnalizadorRutas" \
